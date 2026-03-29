@@ -1,0 +1,164 @@
+{
+  "application": "Leave Management System",
+  "generated_at": "2026-03-27",
+  "source": "ba/requirements.md",
+  "capabilities": [
+    {
+      "id": "CAP-001",
+      "name": "Leave Request Management",
+      "description": "The ability for employees to initiate, modify, and cancel leave requests throughout their lifecycle.",
+      "functions": [
+        {
+          "id": "BF-001",
+          "name": "Submit Leave Request",
+          "description": "An employee selects a leave type, specifies dates and an optional reason, and submits a request for manager approval.",
+          "outcomes": [
+            "Leave request created in PENDING status",
+            "Balance and advance notice validated",
+            "Overlap with existing requests checked",
+            "Manager notified by email"
+          ],
+          "source_refs": ["FR-001", "FR-002", "FR-004", "FR-005", "FR-013a"]
+        },
+        {
+          "id": "BF-002",
+          "name": "Modify Leave Request",
+          "description": "An employee edits the dates or reason of an existing leave request. Approved requests revert to PENDING for re-approval.",
+          "outcomes": [
+            "Request updated and version incremented",
+            "Status reset to PENDING if previously APPROVED",
+            "Manager notified (and HR Admin if was APPROVED)"
+          ],
+          "source_refs": ["FR-010", "BR-005", "FR-013d", "FR-013e"]
+        },
+        {
+          "id": "BF-003",
+          "name": "Cancel Leave Request",
+          "description": "An employee cancels a pending or approved leave request. Balance is restored if the request was approved.",
+          "outcomes": [
+            "Request status set to CANCELLED",
+            "Balance restored if request was APPROVED",
+            "Manager notified by email"
+          ],
+          "source_refs": ["FR-011", "FR-012", "BR-004", "FR-013c"]
+        }
+      ]
+    },
+    {
+      "id": "CAP-002",
+      "name": "Approval Workflow",
+      "description": "The ability for managers to review, approve, or reject leave requests submitted by their direct reports.",
+      "functions": [
+        {
+          "id": "BF-004",
+          "name": "Approve Leave Request",
+          "description": "A manager approves a pending leave request, triggering balance deduction and employee notification.",
+          "outcomes": [
+            "Request status set to APPROVED",
+            "Leave balance deducted for the employee",
+            "Employee notified by email"
+          ],
+          "source_refs": ["FR-007", "FR-008", "FR-009", "FR-013b"]
+        },
+        {
+          "id": "BF-005",
+          "name": "Reject Leave Request",
+          "description": "A manager rejects a pending leave request with an optional comment. No balance change occurs.",
+          "outcomes": [
+            "Request status set to REJECTED",
+            "Employee notified by email with optional comment"
+          ],
+          "source_refs": ["FR-007", "FR-009", "FR-013b"]
+        }
+      ]
+    },
+    {
+      "id": "CAP-003",
+      "name": "Leave Balance Management",
+      "description": "The ability to track, validate, and update leave entitlements per employee and leave type.",
+      "functions": [
+        {
+          "id": "BF-006",
+          "name": "Validate Leave Balance",
+          "description": "Before a request is submitted, the system checks the employee has sufficient balance for the requested leave type and duration.",
+          "outcomes": [
+            "Submission blocked if balance insufficient (unless HR Admin override)",
+            "Pending days reserved on successful submission"
+          ],
+          "source_refs": ["FR-002", "FR-003", "BR-001"]
+        },
+        {
+          "id": "BF-007",
+          "name": "Manage Leave Balances",
+          "description": "HR Admin sets and adjusts leave balance entitlements per employee per leave type per year.",
+          "outcomes": [
+            "Balance record created or updated",
+            "Correct entitlement available for validation at submission"
+          ],
+          "source_refs": ["FR-002", "BR-001"]
+        }
+      ]
+    },
+    {
+      "id": "CAP-004",
+      "name": "Leave Type Administration",
+      "description": "The ability for HR Admin to define and maintain the catalogue of leave types and their rules.",
+      "functions": [
+        {
+          "id": "BF-008",
+          "name": "Manage Leave Types",
+          "description": "HR Admin creates, updates, and deactivates leave types, including their advance notice requirements and balance flags.",
+          "outcomes": [
+            "Leave type catalogue kept current",
+            "Advance notice rules enforced at submission for correct leave type"
+          ],
+          "source_refs": ["LT-001", "LT-002", "LT-003", "LT-004", "BR-002", "FR-004"]
+        }
+      ]
+    },
+    {
+      "id": "CAP-005",
+      "name": "Notifications",
+      "description": "The ability to automatically email relevant stakeholders when key leave request events occur.",
+      "functions": [
+        {
+          "id": "BF-009",
+          "name": "Send Event Notifications",
+          "description": "On each leave lifecycle event, the system determines the correct recipients and dispatches email notifications.",
+          "outcomes": [
+            "Correct stakeholders notified for each event type",
+            "Notification delivery status recorded"
+          ],
+          "source_refs": ["FR-013", "FR-013a", "FR-013b", "FR-013c", "FR-013d", "FR-013e"]
+        }
+      ]
+    },
+    {
+      "id": "CAP-006",
+      "name": "History and Audit",
+      "description": "The ability to maintain a full, immutable record of all leave requests and state changes for compliance and reporting.",
+      "functions": [
+        {
+          "id": "BF-010",
+          "name": "View Leave History",
+          "description": "Employees view their own leave history; managers and HR Admin view history for their scope.",
+          "outcomes": [
+            "Full leave request history available per employee",
+            "Filterable by date, type, and status"
+          ],
+          "source_refs": ["FR-015"]
+        },
+        {
+          "id": "BF-011",
+          "name": "Maintain Audit Trail",
+          "description": "Every state change on a leave request is logged immutably with actor, timestamp, and optional snapshot.",
+          "outcomes": [
+            "Complete audit trail available for all requests",
+            "Point-in-time state reconstruction possible"
+          ],
+          "source_refs": ["FR-016", "NFR-002"]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,50 @@
+{
+  "application": {
+    "name": "Leave Management System",
+    "type": "web_application",
+    "business_domain": "Human Resources / Workforce Management",
+    "description": "A system that enables employees to submit leave requests, managers to approve or reject them, and HR admins to oversee leave types, balances, and history.",
+    "actors": [
+      {
+        "id": "ACT-001",
+        "name": "Employee",
+        "description": "Submits leave requests, views own balances and history, modifies or cancels own requests"
+      },
+      {
+        "id": "ACT-002",
+        "name": "Manager",
+        "description": "Approves or rejects leave requests for direct reports, adds comments"
+      },
+      {
+        "id": "ACT-003",
+        "name": "HR Admin",
+        "description": "Manages leave types and balances, oversees all requests and history, maintains system configuration"
+      }
+    ],
+    "scope": {
+      "in_scope": [
+        "Leave request submission with type, dates, and reason",
+        "Leave balance validation before submission",
+        "Manager approval workflow with comments",
+        "Leave balance update on approval",
+        "Modify and cancel of pending requests",
+        "Stakeholder notifications",
+        "Leave history maintenance",
+        "Audit trail"
+      ],
+      "out_of_scope_assumed": [
+        "Payroll system integration (not mentioned in sources)",
+        "External calendar synchronisation (not mentioned in sources)",
+        "Leave accrual engine (not mentioned in sources)"
+      ]
+    },
+    "non_functional": {
+      "performance": "Response time under 2 seconds",
+      "compliance": "Full audit trail required"
+    },
+    "release_intent": "Initial release covering the full leave request and approval lifecycle",
+    "source_files": [
+      "ba/discovery/leave_management.md"
+    ]
+  }
+}

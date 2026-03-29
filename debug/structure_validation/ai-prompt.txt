@@ -1,0 +1,114 @@
+Skill Debug Prompt
+Skill: structure_validation
+GeneratedAt: 2026-03-29T23:54:19.374Z
+
+Purpose: Validate that the physical folder structure matches the configuration
+
+Missing Input Patterns:
+- (none)
+
+AI Task
+You are executing the following skill. All input files are embedded below.
+Skill Name: structure_validation
+Objective: Validate that the physical folder structure matches the configuration
+
+Rules:
+- Fail if critical root folders are missing
+- Warn if optional folders are missing
+
+Input Files
+
+--- FILE: configuration.json ---
+```json
+{
+  "project": {
+    "name":        "My Project",
+    "type":        "application",
+    "version":     "0.1.0",
+    "methodology": "Model-Driven Engineering",
+    "description": "",
+    "author":      ""
+  },
+
+  "mde": {
+    "path":         "/dev/ai-mde",
+
+    "_note_1": "These file are using in the AI calls.",
+
+    "orchestrator": "/dev/ai-mde/ai-instructions/orchestrator.json",
+    "commands":     "/dev/ai-mde/ai-instructions/commands/",
+    "skills":       "/dev/ai-mde/ai-instructions/skills/",
+    "architecture": "/dev/ai-mde/architecture/",
+    "methodology":  "/dev/ai-mde/methodology/"
+  },
+
+  "ba": {
+    "requirements":      "/dev/leaveManagement/ba/requirements.md",
+    "analysisStatus":    "/dev/leaveManagement/ba/analysis-status.md",
+    "glossary":          "/dev/leaveManagement/ba/glossary.md",
+    "discovery":         "/dev/leaveManagement/ba/discovery",
+    "analyzed":          "/dev/leaveManagement/ba/analyzed",
+    "useCases":          "/dev/leaveManagement/ba/use-cases",
+    "useCasePattern":    "/dev/leaveManagement/ba/use-cases/uc-*.md",
+    "businessFunctions": "/dev/leaveManagement/ba/business-functions.json"
+  },
+
+  "design": {
+    "entities":        "/dev/leaveManagement/design/entities",
+    "entityPattern":   "/dev/leaveManagement/design/entities/ent-*.json",
+    "appArchitecture": "/dev/leaveManagement/design/application_architecture.json",
+    "moduleCatalog":   "/dev/leaveManagement/design/modules/module-catalog.json",
+    "modules":         "/dev/leaveManagement/design/modules",
+    "uiModules":       "/dev/leaveManagement/design/modules/ui",
+    "ldm":             "/dev/leaveManagement/ba/data-model",
+    "sql":             "/dev/leaveManagement/design/sql",
+    "schema":          "/dev/leaveManagement/design/sql/schema.json"
+  },
+
+  "project_state": {
+    "state":              "/dev/leaveManagement/project/project-state.json",
+    "questions":          "/dev/leaveManagement/project/questions.json",
+    "openQueue":          "/dev/leaveManagement/project/open-queue.json",
+    "completedQuestions": "/dev/leaveManagement/project/completed-Questions.json",
+    "commandLog":         "/dev/leaveManagement/project/logs/command-log.jsonl",
+    "methodology":        "/dev/leaveManagement/project/methodology-state.json"
+  },
+
+  "application": {
+    "definition": "/dev/leaveManagement/application/application.json"
+  },
+
+  "scripts": {
+    "setupDb":  "/dev/leaveManagement/scripts/sql/setup-db.sh",
+    "seedData": "/dev/leaveManagement/scripts/loadSeedData.js"
+  },
+
+  "ui": {
+    "framework":   "react",
+    "language":    "typescript",
+    "router":      "react-router-dom",
+    "styling":     "tailwind",
+    "stateClient": "tanstack-query",
+    "authScheme":  "jwt-bearer",
+    "apiProxy":    "http://localhost:3000"
+  },
+
+  "output": {
+    "src":      "/dev/leaveManagement/src",
+    "uiSrc":    "/dev/leaveManagement/ui/src",
+    "commands": "/dev/leaveManagement/output/commands",
+    "docs":     "/dev/leaveManagement/docs"
+  },
+
+  "test": {
+    "root":               "/dev/leaveManagement/test",
+    "unit":               "/dev/leaveManagement/test/unit",
+    "integration":        "/dev/leaveManagement/test/integration",
+    "unitPattern":        "/dev/leaveManagement/test/unit/**/*.test.ts",
+    "integrationPattern": "/dev/leaveManagement/test/integration/**/*.test.ts",
+    "framework":          "jest"
+  }
+}
+```
+
+Produce outputs exactly at the expected paths.

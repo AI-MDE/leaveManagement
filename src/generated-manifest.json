@@ -1,0 +1,82 @@
+{
+  "generated_at": "2026-03-27",
+  "command": "generate_source_code",
+  "modules": [
+    {
+      "id": "MOD-001", "name": "leave-request", "type": "workflow",
+      "files": [
+        "src/leave-request/dto/leave-request.request.dto.ts",
+        "src/leave-request/dto/leave-request.response.dto.ts",
+        "src/leave-request/dto/leave-request.read.dto.ts",
+        "src/leave-request/dto/submit-leave-request.command.ts",
+        "src/leave-request/dto/modify-leave-request.command.ts",
+        "src/leave-request/dto/cancel-leave-request.command.ts",
+        "src/leave-request/dto/approve-leave-request.command.ts",
+        "src/leave-request/dto/reject-leave-request.command.ts",
+        "src/leave-request/dto/leave-request.events.ts",
+        "src/leave-request/domain/leave-request.entity.ts",
+        "src/leave-request/domain/leave-request.validator.ts",
+        "src/leave-request/domain/leave-request.state-machine.ts",
+        "src/leave-request/data_access/leave-request.repository.interface.ts",
+        "src/leave-request/data_access/leave-request.mapper.ts",
+        "src/leave-request/data_access/leave-request.repository.ts",
+        "src/leave-request/service/leave-request.service.interface.ts",
+        "src/leave-request/service/submit-leave-request.service.ts",
+        "src/leave-request/service/modify-leave-request.service.ts",
+        "src/leave-request/service/cancel-leave-request.service.ts",
+        "src/leave-request/service/approve-leave-request.service.ts",
+        "src/leave-request/service/reject-leave-request.service.ts",
+        "src/leave-request/queries/leave-request.query-service.ts",
+        "src/leave-request/controller/leave-request.controller.ts"
+      ]
+    },
+    {
+      "id": "MOD-002", "name": "employee", "type": "master_data",
+      "files": [
+        "src/employee/data_access/employee.repository.interface.ts",
+        "src/employee/data_access/employee.mapper.ts",
+        "src/employee/data_access/employee.repository.ts"
+      ]
+    },
+    {
+      "id": "MOD-003", "name": "leave-type", "type": "master_data",
+      "files": [
+        "src/leave-type/data_access/leave-type.repository.interface.ts",
+        "src/leave-type/data_access/leave-type.mapper.ts",
+        "src/leave-type/data_access/leave-type.repository.ts"
+      ]
+    },
+    {
+      "id": "MOD-004", "name": "leave-balance", "type": "rule_engine",
+      "files": [
+        "src/leave-balance/data_access/leave-balance.repository.interface.ts",
+        "src/leave-balance/data_access/leave-balance.mapper.ts",
+        "src/leave-balance/data_access/leave-balance.repository.ts",
+        "src/leave-balance/domain/leave-balance.rules.ts",
+        "src/leave-balance/service/leave-balance.service.interface.ts",
+        "src/leave-balance/service/leave-balance.service.ts"
+      ]
+    },
+    {
+      "id": "MOD-005", "name": "notification", "type": "integration",
+      "files": [
+        "src/notification/service/notification.service.ts"
+      ]
+    },
+    {
+      "id": "MOD-006", "name": "audit", "type": "integration",
+      "files": [
+        "src/audit/service/audit.service.interface.ts",
+        "src/audit/service/audit.service.ts",
+        "src/audit/data_access/audit.repository.ts",
+        "src/audit/queries/audit.query-service.ts"
+      ]
+    }
+  ],
+  "shared": [
+    "src/shared/events/domain-event.ts",
+    "src/shared/events/domain-event-publisher.ts",
+    "src/shared/db/database-client.ts",
+    "src/shared/actor-context.ts"
+  ]
+}

@@ -1,0 +1,813 @@
+Skill Debug Prompt
+Skill: system_design
+GeneratedAt: 2026-03-29T23:54:20.219Z
+
+Purpose: Generate architecture and design artifacts from validated business analysis outputs, following the iterative design process defined in system-design-process.md
+
+Missing Input Patterns:
+- /dev/ai-mde/architecture/
+- mde/docs/design/system-design-process.md
+- mde/docs/design/use-case-mapping.md
+
+AI Task
+You are executing the following skill. All input files are embedded below.
+Skill Name: system_design
+Objective: Generate architecture and design artifacts from validated business analysis outputs, following the iterative design process defined in system-design-process.md
+
+Rules:
+- Module types must be drawn from architecture.json module_types: workflow, master_data, integration, reporting, rule_engine
+- Every write use case must produce exactly one Service class and one Command type
+- Every read requirement must produce exactly one QueryService class and one ReadDto
+- Every aggregate root must have: Entity, Repository port (interface), Repository impl, Mapper
+- Reads route through query_service -> data_access — never through service or domain
+- Writes route through service -> domain Entity -> data_access
+- Requirement-to-module traceability must exist for every business rule
+- Patterns must be explicit and drawn from architecture.json patterns
+- Runtime components and code modules must be distinguished
+
+Input Files
+
+--- FILE: ba/business-functions.json ---
+```json
+{
+  "application": "Leave Management System",
+  "generated_at": "2026-03-27",
+  "source": "ba/requirements.md",
+  "capabilities": [
+    {
+      "id": "CAP-001",
+      "name": "Leave Request Management",
+      "description": "The ability for employees to initiate, modify, and cancel leave requests throughout their lifecycle.",
+      "functions": [
+        {
+          "id": "BF-001",
+          "name": "Submit Leave Request",
+          "description": "An employee selects a leave type, specifies dates and an optional reason, and submits a request for manager approval.",
+          "outcomes": [
+            "Leave request created in PENDING status",
+            "Balance and advance notice validated",
+            "Overlap with existing requests checked",
+            "Manager notified by email"
+          ],
+          "source_refs": ["FR-001", "FR-002", "FR-004", "FR-005", "FR-013a"]
+        },
+        {
+          "id": "BF-002",
+          "name": "Modify Leave Request",
+          "description": "An employee edits the dates or reason of an existing leave request. Approved requests revert to PENDING for re-approval.",
+          "outcomes": [
+            "Request updated and version incremented",
+            "Status reset to PENDING if previously APPROVED",
+            "Manager notified (and HR Admin if was APPROVED)"
+          ],
+          "source_refs": ["FR-010", "BR-005", "FR-013d", "FR-013e"]
+        },
+        {
+          "id": "BF-003",
+          "name": "Cancel Leave Request",
+          "description": "An employee cancels a pending or approved leave request. Balance is restored if the request was approved.",
+          "outcomes": [
+            "Request status set to CANCELLED",
+            "Balance restored if request was APPROVED",
+            "Manager notified by email"
+          ],
+          "source_refs": ["FR-011", "FR-012", "BR-004", "FR-013c"]
+        }
+      ]
+    },
+    {
+      "id": "CAP-002",
+      "name": "Approval Workflow",
+      "description": "The ability for managers to review, approve, or reject leave requests submitted by their direct reports.",
+      "functions": [
+        {
+          "id": "BF-004",
+          "name": "Approve Leave Request",
+          "description": "A manager approves a pending leave request, triggering balance deduction and employee notification.",
+          "outcomes": [
+            "Request status set to APPROVED",
+            "Leave balance deducted for the employee",
+            "Employee notified by email"
+          ],
+          "source_refs": ["FR-007", "FR-008", "FR-009", "FR-013b"]
+        },
+        {
+          "id": "BF-005",
+          "name": "Reject Leave Request",
+          "description": "A manager rejects a pending leave request with an optional comment. No balance change occurs.",
+          "outcomes": [
+            "Request status set to REJECTED",
+            "Employee notified by email with optional comment"
+          ],
+          "source_refs": ["FR-007", "FR-009", "FR-013b"]
+        }
+      ]
+    },
+    {
+      "id": "CAP-003",
+      "name": "Leave Balance Management",
+      "description": "The ability to track, validate, and update leave entitlements per employee and leave type.",
+      "functions": [
+        {
+          "id": "BF-006",
+          "name": "Validate Leave Balance",
+          "description": "Before a request is submitted, the system checks the employee has sufficient balance for the requested leave type and duration.",
+          "outcomes": [
+            "Submission blocked if balance insufficient (unless HR Admin override)",
+            "Pending days reserved on successful submission"
+          ],
+          "source_refs": ["FR-002", "FR-003", "BR-001"]
+        },
+        {
+          "id": "BF-007",
+          "name": "Manage Leave Balances",
+          "description": "HR Admin sets and adjusts leave balance entitlements per employee per leave type per year.",
+          "outcomes": [
+            "Balance record created or updated",
+            "Correct entitlement available for validation at submission"
+          ],
+          "source_refs": ["FR-002", "BR-001"]
+        }
+      ]
+    },
+    {
+      "id": "CAP-004",
+      "name": "Leave Type Administration",
+      "description": "The ability for HR Admin to define and maintain the catalogue of leave types and their rules.",
+      "functions": [
+        {
+          "id": "BF-008",
+          "name": "Manage Leave Types",
+          "description": "HR Admin creates, updates, and deactivates leave types, including their advance notice requirements and balance flags.",
+          "outcomes": [
+            "Leave type catalogue kept current",
+            "Advance notice rules enforced at submission for correct leave type"
+          ],
+          "source_refs": ["LT-001", "LT-002", "LT-003", "LT-004", "BR-002", "FR-004"]
+        }
+      ]
+    },
+    {
+      "id": "CAP-005",
+      "name": "Notifications",
+      "description": "The ability to automatically email relevant stakeholders when key leave request events occur.",
+      "functions": [
+        {
+          "id": "BF-009",
+          "name": "Send Event Notifications",
+          "description": "On each leave lifecycle event, the system determines the correct recipients and dispatches email notifications.",
+          "outcomes": [
+            "Correct stakeholders notified for each event type",
+            "Notification delivery status recorded"
+          ],
+          "source_refs": ["FR-013", "FR-013a", "FR-013b", "FR-013c", "FR-013d", "FR-013e"]
+        }
+      ]
+    },
+    {
+      "id": "CAP-006",
+      "name": "History and Audit",
+      "description": "The ability to maintain a full, immutable record of all leave requests and state changes for compliance and reporting.",
+      "functions": [
+        {
+          "id": "BF-010",
+          "name": "View Leave History",
+          "description": "Employees view their own leave history; managers and HR Admin view history for their scope.",
+          "outcomes": [
+            "Full leave request history available per employee",
+            "Filterable by date, type, and status"
+          ],
+          "source_refs": ["FR-015"]
+        },
+        {
+          "id": "BF-011",
+          "name": "Maintain Audit Trail",
+          "description": "Every state change on a leave request is logged immutably with actor, timestamp, and optional snapshot.",
+          "outcomes": [
+            "Complete audit trail available for all requests",
+            "Point-in-time state reconstruction possible"
+          ],
+          "source_refs": ["FR-016", "NFR-002"]
+        }
+      ]
+    }
+  ]
+}
+```
+
+--- FILE: ba/requirements.md ---
+```md
+# Requirements Baseline — Leave Management System
+
+> **Status:** Baselined — all clarification questions resolved
+> **Source:** ba/discovery/leave_management.md
+> **Last updated:** 2026-03-27
+
+---
+
+## 1. Business Context
+
+The Leave Management System enables employees to submit time-off requests, managers to approve or reject them, and HR Admins to oversee leave types, balances, and history. The system must maintain a full audit trail and respond within 2 seconds.
+
+---
+
+## 2. Actors
+
+| ID      | Actor     | Role |
+|---------|-----------|------|
+| ACT-001 | Employee  | Submits, modifies, and cancels own leave requests; views own balance and history |
+| ACT-002 | Manager   | Reviews and approves or rejects leave requests for direct reports |
+| ACT-003 | HR Admin  | Manages leave types, balances, and system-wide configuration; oversees all requests |
+
+---
+
+## 3. Functional Requirements
+
+### 3.1 Leave Request Submission
+
+| ID     | Requirement | Status |
+|--------|-------------|--------|
+| FR-001 | An Employee shall be able to submit a leave request specifying leave type, start date, end date, and an optional reason. | Explicit |
+| FR-002 | The system shall validate the Employee's available leave balance before submission. | Explicit |
+| FR-003 | If balance is insufficient, the system shall block submission unless an override is permitted. | Explicit |
+| FR-004 | The system shall enforce a minimum advance notice period per leave type: Annual Leave requires 14 days notice; Unpaid Leave requires 30 days notice; Maternity/Paternity Leave requires 30 days notice; Sick Leave has no advance notice requirement. | Resolved — Q-001 |
+| FR-005 | The system shall prevent overlapping leave requests for the same employee. Team capacity is visible to managers but the system does not enforce team-level overlap. | Resolved — Q-002 |
+
+### 3.2 Approval Workflow
+
+| ID     | Requirement | Status |
+|--------|-------------|--------|
+| FR-006 | A submitted leave request shall be routed to the Employee's direct Manager for approval. | Explicit |
+| FR-007 | A Manager shall be able to approve or reject a leave request with an optional comment. | Explicit |
+| FR-008 | On approval, the system shall deduct the approved days from the Employee's leave balance. | Explicit |
+| FR-009 | The approval chain is single-level: Employee submits to direct Manager. HR Admin can override or intervene but is not part of the standard approval chain. | Resolved — Q-003 |
+
+### 3.3 Modify and Cancel
+
+| ID     | Requirement | Status |
+|--------|-------------|--------|
+| FR-010 | An Employee shall be able to modify a pending (not yet approved) leave request. Modification of an approved request requires re-approval. | Resolved — Q-004 |
+| FR-011 | An Employee shall be able to cancel a pending leave request. | Explicit |
+| FR-012 | An Employee shall be able to cancel an approved leave request. On cancellation, the system shall restore the balance and notify the Manager. | Resolved — Q-004 |
+
+### 3.4 Notifications
+
+| ID     | Requirement | Status |
+|--------|-------------|--------|
+| FR-013 | The system shall send email notifications on the following events: | Resolved — Q-005 |
+| FR-013a | On submission: notify Manager. | Resolved |
+| FR-013b | On approval or rejection: notify Employee. | Resolved |
+| FR-013c | On cancellation of any request: notify Manager. | Resolved |
+| FR-013d | On modification of a pending request: notify Manager. | Resolved |
+| FR-013e | On modification of an approved request: notify Manager and HR Admin. | Resolved |
+
+### 3.5 Leave History and Audit
+
+| ID     | Requirement | Status |
+|--------|-------------|--------|
+| FR-015 | The system shall maintain a full history of all leave requests per employee. | Explicit |
+| FR-016 | The system shall maintain a full audit trail of all state changes. | Explicit |
+
+---
+
+## 4. Business Rules
+
+| ID     | Rule | Status |
+|--------|------|--------|
+| BR-001 | An employee cannot submit a leave request that exceeds their available balance, unless explicitly overridden by HR Admin. | Baselined |
+| BR-002 | Advance notice rules by leave type: Annual Leave — 14 days; Unpaid Leave — 30 days; Maternity/Paternity Leave — 30 days; Sick Leave — none. | Resolved — Q-001 |
+| BR-003 | No employee may have two overlapping approved or pending leave requests. Overlap checking is per-employee only; team capacity is informational, not enforced. | Resolved — Q-002 |
+| BR-004 | Cancellation of an approved leave request restores the deducted balance and triggers a notification to the Manager. | Resolved — Q-004 |
+| BR-005 | Modification of an approved leave request requires re-approval and notifies Manager and HR Admin. | Resolved — Q-004 |
+
+---
+
+## 5. Leave Types
+
+| ID   | Name                    | Advance Notice | Notes |
+|------|-------------------------|----------------|-------|
+| LT-001 | Annual Leave          | 14 days        |       |
+| LT-002 | Sick Leave            | None           |       |
+| LT-003 | Unpaid Leave          | 30 days        |       |
+| LT-004 | Maternity/Paternity Leave | 30 days    |       |
+
+---
+
+## 6. Non-Functional Requirements
+
+| ID      | Requirement | Status |
+|---------|-------------|--------|
+| NFR-001 | The system shall respond to user actions within 2 seconds under normal load. | Explicit |
+| NFR-002 | The system shall maintain a full audit trail of all data changes. | Explicit |
+
+---
+
+## 7. Out of Scope (Assumed)
+
+- Payroll system integration
+- External calendar synchronisation
+- Leave accrual engine / automatic balance top-up
+- Team-level capacity enforcement (visible but not enforced)
+
+---
+
+## 8. Open Items
+
+None. All clarification questions resolved. See `project/completed-Questions.json` for the accepted answers.
+```
+
+--- FILE: ba/use-cases/uc-001-submit-leave-request.md ---
+```md
+# UC-001 — Submit Leave Request
+
+**Business Function:** BF-001
+**Phase:** Business Analysis
+**Last updated:** 2026-03-27
+
+---
+
+## Description
+An Employee submits a new leave request by selecting a leave type, specifying a date range, and optionally providing a reason. The system validates balance, advance notice, and overlap before routing the request to the Employee's Manager for approval.
+
+## Actors
+- **Primary:** Employee
+- **Secondary:** Manager (notified on submission)
+
+## Preconditions
+- Employee is authenticated.
+- At least one active leave type exists.
+- Employee has a direct Manager assigned.
+
+## Main Flow
+1. Employee selects a leave type, start date, end date, and optional reason.
+2. System calculates the number of requested days.
+3. System checks that the start date meets the advance notice requirement for the selected leave type.
+4. System checks that the Employee has sufficient balance (if the leave type requires a balance).
+5. System checks that the requested dates do not overlap with any existing PENDING or APPROVED request for the Employee.
+6. System creates the leave request in PENDING status.
+7. System sends an email notification to the Manager.
+
+## Alternative Flows
+- **3a. Advance notice not met:** System blocks submission and returns the minimum notice period required.
+- **4a. Insufficient balance:** System blocks submission and returns the current available balance.
+- **5a. Overlap detected:** System blocks submission and identifies the conflicting request.
+
+## Postconditions
+- Leave request exists in PENDING status.
+- Manager has received an email notification.
+- Pending days are reserved against the Employee's balance.
+
+## Business Rules
+- BR-001: Balance must cover the requested days (unless HR Admin override).
+- BR-002: Advance notice per leave type must be satisfied.
+- BR-003: No overlapping PENDING or APPROVED requests for the same Employee.
+
+## Traceability
+FR-001, FR-002, FR-003, FR-004, FR-005, FR-013a
+```
+
+--- FILE: ba/use-cases/uc-002-modify-leave-request.md ---
+```md
+# UC-002 — Modify Leave Request
+
+**Business Function:** BF-002
+**Phase:** Business Analysis
+**Last updated:** 2026-03-27
+
+---
+
+## Description
+An Employee modifies the dates or reason of an existing leave request. If the request is PENDING, it remains PENDING and the Manager is notified. If the request was APPROVED, it reverts to PENDING for re-approval and both the Manager and HR Admin are notified.
+
+## Actors
+- **Primary:** Employee
+- **Secondary:** Manager (notified on modification); HR Admin (notified if approved request is modified)
+
+## Preconditions
+- Employee is authenticated.
+- The target leave request exists and belongs to the Employee.
+- The request is in PENDING or APPROVED status.
+
+## Main Flow
+1. Employee selects an existing PENDING or APPROVED leave request.
+2. Employee updates the start date, end date, and/or reason.
+3. System recalculates the number of requested days.
+4. System re-validates advance notice, balance, and overlap against the new dates.
+5. System increments the request version.
+6. If the request was APPROVED, system resets status to PENDING.
+7. System sends email notification: Manager only (if was PENDING); Manager and HR Admin (if was APPROVED).
+
+## Alternative Flows
+- **4a. Re-validation fails:** System blocks the modification and returns the specific validation failure.
+- **2a. Request is CANCELLED or REJECTED:** Modification is not permitted; system returns an error.
+
+## Postconditions
+- Leave request is updated with new dates/reason and incremented version.
+- Status is PENDING (either unchanged or reset from APPROVED).
+- Correct stakeholders have been notified.
+
+## Business Rules
+- BR-002: Advance notice re-checked against new start date.
+- BR-003: Overlap re-checked against new date range.
+- BR-005: Modification of an APPROVED request requires re-approval.
+
+## Traceability
+FR-010, BR-005, FR-013d, FR-013e
+```
+
+--- FILE: ba/use-cases/uc-003-cancel-leave-request.md ---
+```md
+# UC-003 — Cancel Leave Request
+
+**Business Function:** BF-003
+**Phase:** Business Analysis
+**Last updated:** 2026-03-27
+
+---
+
+## Description
+An Employee cancels a leave request that is in PENDING or APPROVED status. If the request was APPROVED, the system restores the deducted balance and notifies the Manager.
+
+## Actors
+- **Primary:** Employee
+- **Secondary:** Manager (notified on cancellation)
+
+## Preconditions
+- Employee is authenticated.
+- The target leave request exists and belongs to the Employee.
+- The request is in PENDING or APPROVED status.
+
+## Main Flow
+1. Employee selects a PENDING or APPROVED leave request and requests cancellation.
+2. System sets the request status to CANCELLED.
+3. If the request was APPROVED, system restores the leave balance for the Employee.
+4. System sends an email notification to the Manager.
+5. System appends an audit entry (CANCELLED; BALANCE_RESTORED if applicable).
+
+## Alternative Flows
+- **1a. Request is already CANCELLED or REJECTED:** Cancellation is not permitted; system returns an error.
+
+## Postconditions
+- Request status is CANCELLED.
+- If the request was APPROVED, the Employee's balance has been restored.
+- Manager has been notified by email.
+- Audit trail reflects the cancellation event.
+
+## Business Rules
+- BR-004: Cancellation of an APPROVED request restores the deducted balance.
+
+## Traceability
+FR-011, FR-012, BR-004, FR-013c
+```
+
+--- FILE: ba/use-cases/uc-004-approve-leave-request.md ---
+```md
+# UC-004 — Approve Leave Request
+
+**Business Function:** BF-004
+**Phase:** Business Analysis
+**Last updated:** 2026-03-27
+
+---
+
+## Description
+A Manager reviews a PENDING leave request from a direct report and approves it. The system deducts the approved days from the Employee's balance and notifies the Employee.
+
+## Actors
+- **Primary:** Manager
+- **Secondary:** Employee (notified on approval)
+
+## Preconditions
+- Manager is authenticated.
+- The target leave request is in PENDING status.
+- The requesting Employee is a direct report of the Manager.
+
+## Main Flow
+1. Manager views the list of pending leave requests for their direct reports.
+2. Manager selects a leave request and optionally adds a comment.
+3. Manager confirms approval.
+4. System sets the request status to APPROVED and records the reviewing Manager and timestamp.
+5. System deducts the approved days from the Employee's leave balance.
+6. System sends an email notification to the Employee.
+7. System appends an audit entry (APPROVED).
+
+## Alternative Flows
+- **3a. Request was modified after routing (version mismatch):** System warns the Manager of the updated version before confirming.
+
+## Postconditions
+- Request status is APPROVED.
+- Employee's leave balance reflects the deduction.
+- Employee has been notified by email.
+- Audit trail reflects the approval event.
+
+## Business Rules
+- FR-008: Balance deduction occurs on approval, not on submission.
+- FR-009: Approval is single-level — only the direct Manager may approve.
+
+## Traceability
+FR-006, FR-007, FR-008, FR-009, FR-013b
+```
+
+--- FILE: ba/use-cases/uc-005-reject-leave-request.md ---
+```md
+# UC-005 — Reject Leave Request
+
+**Business Function:** BF-005
+**Phase:** Business Analysis
+**Last updated:** 2026-03-27
+
+---
+
+## Description
+A Manager reviews a PENDING leave request from a direct report and rejects it. No balance change occurs. The Employee is notified with the optional rejection comment.
+
+## Actors
+- **Primary:** Manager
+- **Secondary:** Employee (notified on rejection)
+
+## Preconditions
+- Manager is authenticated.
+- The target leave request is in PENDING status.
+- The requesting Employee is a direct report of the Manager.
+
+## Main Flow
+1. Manager views the list of pending leave requests for their direct reports.
+2. Manager selects a leave request and optionally adds a rejection comment.
+3. Manager confirms rejection.
+4. System sets the request status to REJECTED and records the reviewing Manager, comment, and timestamp.
+5. System sends an email notification to the Employee.
+6. System appends an audit entry (REJECTED).
+
+## Alternative Flows
+- None.
+
+## Postconditions
+- Request status is REJECTED.
+- Employee's leave balance is unchanged.
+- Employee has been notified by email with the optional comment.
+- Audit trail reflects the rejection event.
+
+## Business Rules
+- FR-009: Rejection is single-level — only the direct Manager may reject.
+
+## Traceability
+FR-007, FR-009, FR-013b
+```
+
+--- FILE: ba/use-cases/uc-006-validate-leave-balance.md ---
+```md
+# UC-006 — Validate Leave Balance
+
+**Business Function:** BF-006
+**Phase:** Business Analysis
+**Last updated:** 2026-03-27
+
+---
+
+## Description
+The system automatically validates an Employee's leave balance when a leave request is submitted. This is a system-initiated use case triggered as part of UC-001 (Submit Leave Request).
+
+## Actors
+- **Primary:** System (triggered during leave request submission)
+- **Secondary:** Employee (receives outcome — blocked or allowed)
+
+## Preconditions
+- A leave request submission has been initiated (UC-001 is in progress).
+- A leave balance record exists for the Employee, leave type, and current year.
+
+## Main Flow
+1. System retrieves the Employee's current balance for the requested leave type and year.
+2. System calculates available days: total_days − used_days − pending_days.
+3. System compares available days against the requested total_days.
+4. If sufficient: submission proceeds.
+5. System reserves the requested days as pending_days.
+
+## Alternative Flows
+- **3a. Insufficient balance:** System blocks the submission and returns the available balance to the Employee.
+- **3b. Leave type does not require a balance (e.g. Unpaid Leave):** Validation is skipped; submission proceeds.
+
+## Postconditions
+- If sufficient: pending_days on the balance record are incremented by the requested total_days.
+- If insufficient: submission is blocked; balance record is unchanged.
+
+## Business Rules
+- BR-001: An employee cannot submit a request exceeding their available balance unless HR Admin overrides.
+
+## Traceability
+FR-002, FR-003, BR-001
+```
+
+--- FILE: ba/use-cases/uc-007-manage-leave-balances.md ---
+```md
+# UC-007 — Manage Leave Balances
+
+**Business Function:** BF-007
+**Phase:** Business Analysis
+**Last updated:** 2026-03-27
+
+---
+
+## Description
+An HR Admin sets or adjusts leave balance entitlements for an Employee for a specific leave type and year.
+
+## Actors
+- **Primary:** HR Admin
+
+## Preconditions
+- HR Admin is authenticated.
+- The target Employee and leave type exist.
+
+## Main Flow
+1. HR Admin selects an Employee and a leave type.
+2. HR Admin specifies the total_days entitlement for the year.
+3. System creates or updates the leave balance record for that Employee, leave type, and year.
+4. System preserves any existing used_days and pending_days values.
+
+## Alternative Flows
+- **2a. Balance record already exists:** System updates total_days only; used_days and pending_days are not reset.
+
+## Postconditions
+- Leave balance record exists with the correct total_days for the Employee, leave type, and year.
+
+## Business Rules
+- BR-001: Balance entitlement must be set before employees can submit requests for that leave type.
+
+## Traceability
+FR-002, BR-001
+```
+
+--- FILE: ba/use-cases/uc-008-manage-leave-types.md ---
+```md
+# UC-008 — Manage Leave Types
+
+**Business Function:** BF-008
+**Phase:** Business Analysis
+**Last updated:** 2026-03-27
+
+---
+
+## Description
+An HR Admin creates, updates, or deactivates a leave type in the system catalogue, including its advance notice requirements and balance flag.
+
+## Actors
+- **Primary:** HR Admin
+
+## Preconditions
+- HR Admin is authenticated.
+
+## Main Flow
+1. HR Admin navigates to the leave type catalogue.
+2. HR Admin creates a new leave type or selects an existing one to edit.
+3. HR Admin specifies: name, code, advance notice days, and whether the type requires a balance.
+4. System saves the leave type.
+
+## Alternative Flows
+- **3a. Deactivate:** HR Admin sets the leave type to inactive. Existing requests referencing the type are unaffected; new submissions for this type are blocked.
+- **3b. Duplicate code:** System rejects the save and returns a uniqueness error.
+
+## Postconditions
+- Leave type catalogue is updated.
+- New submissions will apply the updated rules immediately.
+
+## Business Rules
+- BR-002: Advance notice days defined here are enforced at submission time for all requests of this type.
+
+## Traceability
+LT-001, LT-002, LT-003, LT-004, BR-002, FR-004
+```
+
+--- FILE: ba/use-cases/uc-009-send-event-notifications.md ---
+```md
+# UC-009 — Send Event Notifications
+
+**Business Function:** BF-009
+**Phase:** Business Analysis
+**Last updated:** 2026-03-27
+
+---
+
+## Description
+The system automatically dispatches email notifications to the correct stakeholders when a leave request lifecycle event occurs. This is a system-initiated use case triggered by other use cases.
+
+## Actors
+- **Primary:** System
+- **Secondary:** Manager, Employee, HR Admin (as notification recipients)
+
+## Preconditions
+- A leave lifecycle event has occurred (submission, approval, rejection, cancellation, or modification).
+- Recipient email addresses are available.
+
+## Main Flow
+1. System receives a notification trigger with the event type and leave request ID.
+2. System determines recipients based on the event type (see notification matrix below).
+3. System composes the email message for the event.
+4. System dispatches the email to each recipient.
+5. System records the notification with status SENT.
+
+**Notification Matrix:**
+
+| Event | Recipients |
+|---|---|
+| SUBMITTED | Manager |
+| APPROVED | Employee |
+| REJECTED | Employee |
+| CANCELLED | Manager |
+| MODIFIED_PENDING | Manager |
+| MODIFIED_APPROVED | Manager, HR Admin |
+
+## Alternative Flows
+- **4a. Dispatch fails:** System records the notification with status FAILED. No retry in scope for this release.
+
+## Postconditions
+- Notification record exists with status SENT or FAILED.
+- Recipients have received the email (on success).
+
+## Business Rules
+- Channel is email only (Q-005).
+
+## Traceability
+FR-013, FR-013a, FR-013b, FR-013c, FR-013d, FR-013e
+```
+
+--- FILE: ba/use-cases/uc-010-view-leave-history.md ---
+```md
+# UC-010 — View Leave History
+
+**Business Function:** BF-010
+**Phase:** Business Analysis
+**Last updated:** 2026-03-27
+
+---
+
+## Description
+An Employee views their own leave request history. A Manager views history for their direct reports. An HR Admin views history for all employees.
+
+## Actors
+- **Primary:** Employee, Manager, HR Admin
+
+## Preconditions
+- Actor is authenticated.
+
+## Main Flow
+1. Actor navigates to the leave history view.
+2. System returns leave requests scoped to the actor's role:
+   - Employee: own requests only.
+   - Manager: requests from direct reports.
+   - HR Admin: all requests system-wide.
+3. Actor optionally filters by date range, leave type, or status.
+4. System returns the filtered list.
+
+## Alternative Flows
+- None.
+
+## Postconditions
+- Actor has viewed the relevant leave history. No data is modified.
+
+## Business Rules
+- None beyond role-based scoping.
+
+## Traceability
+FR-015
+```
+
+--- FILE: ba/use-cases/uc-011-maintain-audit-trail.md ---
+```md
+# UC-011 — Maintain Audit Trail
+
+**Business Function:** BF-011
+**Phase:** Business Analysis
+**Last updated:** 2026-03-27
+
+---
+
+## Description
+The system appends an immutable audit entry for every state change on a leave request. Authorized actors can view the full audit trail for a given request.
+
+## Actors
+- **Primary:** System (write); Manager, HR Admin (read)
+
+## Preconditions
+- A state-changing event has occurred on a leave request (submit, approve, reject, cancel, modify, balance restore).
+
+## Main Flow
+1. System detects a state change event.
+2. System appends a new audit entry recording: actor, action, from_status, to_status, timestamp, and optional comment/snapshot.
+3. Manager or HR Admin may request the audit trail for a specific leave request.
+4. System returns the full ordered list of audit entries for that request.
+
+## Alternative Flows
+- None. Audit entries are never updated or deleted.
+
+## Postconditions
+- A new immutable audit entry exists for the event.
+- The audit trail is complete and ordered by occurrence time.
+
+## Business Rules
+- NFR-002: Full audit trail is mandatory for all data changes.
+- Audit records are append-only — no updates or deletes permitted.
+
+## Traceability
+FR-015, FR-016, NFR-002
+```
+
+Produce outputs exactly at the expected paths.

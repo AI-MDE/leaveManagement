@@ -1,0 +1,224 @@
+{
+  "moduleId": "MOD-001",
+  "moduleName": "LeaveRequest",
+  "table": "leave_requests",
+  "moduleType": "workflow",
+  "entityRef": "design/entities/ent-leave-request.json",
+  "generates": ["dto", "data_access", "domain", "service", "query_service"],
+  "optimisticLocking": true,
+  "auditRequired": true,
+  "charter": {
+    "responsibilities": [
+      "Own the full leave request lifecycle: submit, approve, reject, modify, cancel",
+      "Enforce state transition rules via LeaveRequestStateMachine",
+      "Enforce overlap constraint (BR-003) via LeaveRequestValidator",
+      "Delegate balance validation and deduction to leave-balance module",
+      "Delegate advance notice validation to leave-type module data",
+      "Trigger domain events on every state change",
+      "Delegate audit entry creation to audit module via IAuditService",
+      "Delegate notification dispatch to notification module via INotificationService"
+    ],
+    "exclusions": [
+      "Balance arithmetic — owned by MOD-004 leave-balance",
+      "Leave type rule storage — owned by MOD-003 leave-type",
+      "Email dispatch — owned by MOD-005 notification",
+      "Audit record persistence — owned by MOD-006 audit",
+      "Employee identity and hierarchy — owned by MOD-002 employee"
+    ],
+    "dependencies": [
+      { "moduleId": "MOD-002", "moduleName": "employee",      "reason": "Resolve requesting employee and their direct manager for routing" },
+      { "moduleId": "MOD-003", "moduleName": "leave-type",    "reason": "Read advance_notice_days and requires_balance for validation" },
+      { "moduleId": "MOD-004", "moduleName": "leave-balance",  "reason": "Validate, reserve, deduct, and restore balance" },
+      { "moduleId": "MOD-005", "moduleName": "notification",   "reason": "Trigger email notifications on lifecycle events" },
+      { "moduleId": "MOD-006", "moduleName": "audit",          "reason": "Append immutable audit entries on every state change" }
+    ],
+    "requirementMapping": [
+      { "ruleId": "BR-002", "mappedTo": "service",     "artifact": "SubmitLeaveRequestService",  "description": "Check start_date >= submitted_at + advance_notice_days before persisting" },
+      { "ruleId": "BR-003", "mappedTo": "domain",      "artifact": "LeaveRequestValidator",      "description": "Reject submission if any PENDING/APPROVED request overlaps the date range" },
+      { "ruleId": "BR-004", "mappedTo": "service",     "artifact": "CancelLeaveRequestService",  "description": "Call LeaveBalanceService.restore() when cancelling an APPROVED request" },
+      { "ruleId": "BR-005", "mappedTo": "domain",      "artifact": "LeaveRequestStateMachine",   "description": "Modification of APPROVED request transitions status back to PENDING" },
+      { "ruleId": "FR-006", "mappedTo": "service",     "artifact": "SubmitLeaveRequestService",  "description": "Route request to employee.manager_id for approval" },
+      { "ruleId": "FR-008", "mappedTo": "service",     "artifact": "ApproveLeaveRequestService", "description": "Call LeaveBalanceService.deduct() on approval" }
+    ]
+  },
+  "spec": {
+    "schema": {
+      "table": "leave_requests",
+      "columns": [
+        { "name": "id",              "type": "uuid",     "required": true,  "default": "gen_random_uuid()" },
+        { "name": "employee_id",     "type": "uuid",     "required": true,  "default": null,  "description": "FK -> employees.id" },
+        { "name": "leave_type_id",   "type": "uuid",     "required": true,  "default": null,  "description": "FK -> leave_types.id" },
+        { "name": "start_date",      "type": "date",     "required": true,  "default": null },
+        { "name": "end_date",        "type": "date",     "required": true,  "default": null },
+        { "name": "total_days",      "type": "decimal",  "required": true,  "default": null },
+        { "name": "reason",          "type": "string",   "required": false, "default": null },
+        { "name": "status",          "type": "enum",     "required": true,  "default": "PENDING", "enum": ["PENDING", "APPROVED", "REJECTED", "CANCELLED"] },
+        { "name": "submitted_at",    "type": "datetime", "required": true,  "default": "now()" },
+        { "name": "reviewed_at",     "type": "datetime", "required": false, "default": null },
+        { "name": "reviewed_by",     "type": "uuid",     "required": false, "default": null,  "description": "FK -> employees.id (manager)" },
+        { "name": "manager_comment", "type": "string",   "required": false, "default": null },
+        { "name": "version",         "type": "integer",  "required": true,  "default": 1,     "description": "Optimistic locking; incremented on each modification" },
+        { "name": "created_at",      "type": "datetime", "required": true,  "default": "now()" },
+        { "name": "updated_at",      "type": "datetime", "required": true,  "default": "now()" }
+      ],
+      "indexes": [
+        { "fields": ["employee_id", "status"],           "unique": false, "description": "Employee request list filtered by status" },
+        { "fields": ["reviewed_by"],                      "unique": false, "description": "Manager pending queue" },
+        { "fields": ["employee_id", "start_date", "end_date"], "unique": false, "where": "status IN ('PENDING','APPROVED')", "description": "Overlap check — partial index on active requests" }
+      ]
+    },
+    "interfaces": {
+      "service": [
+        {
+          "layer": "service",
+          "name": "submit",
+          "command": "SubmitLeaveRequestCommand",
+          "response": "LeaveRequestResponseDto",
+          "signature": "submit(cmd: SubmitLeaveRequestCommand, actor: ActorContext): Promise<LeaveRequestResponseDto>",
+          "steps": ["authorize (role=EMPLOYEE)", "load LeaveType for advance notice", "validate advance notice", "call LeaveBalanceService.validateAndReserve()", "load existing active requests for overlap check", "domain: LeaveRequestValidator.checkOverlap()", "save new entity (status=PENDING)", "call AuditService.append(SUBMITTED)", "emit LeaveRequestSubmittedEvent"],
+          "description": "Validates and persists a new leave request, routes to manager",
+          "errorConditions": [
+            "InsufficientBalanceError — available balance < total_days",
+            "AdvanceNoticeViolationError — start_date < submitted_at + advance_notice_days",
+            "OverlappingRequestError — date range overlaps existing PENDING or APPROVED request",
+            "LeaveTypeNotFoundError — leave_type_id does not exist or is inactive",
+            "ManagerNotAssignedError — employee has no manager_id"
+          ]
+        },
+        {
+          "layer": "service",
+          "name": "modify",
+          "command": "ModifyLeaveRequestCommand",
+          "response": "LeaveRequestResponseDto",
+          "signature": "modify(cmd: ModifyLeaveRequestCommand, actor: ActorContext): Promise<LeaveRequestResponseDto>",
+          "steps": ["authorize (owner=employee_id)", "load existing request", "domain: StateMachine.assertModifiable()", "re-validate advance notice and overlap on new dates", "if APPROVED: call LeaveBalanceService.restore() then re-reserve", "domain: increment version, reset status to PENDING if was APPROVED", "save", "call AuditService.append(MODIFIED)", "emit LeaveRequestModifiedEvent"],
+          "description": "Updates dates/reason; resets APPROVED requests to PENDING for re-approval",
+          "errorConditions": [
+            "RequestNotFoundError — request does not exist",
+            "ForbiddenError — actor is not the request owner",
+            "InvalidStateError — request is REJECTED or CANCELLED",
+            "AdvanceNoticeViolationError — new start_date violates notice rule",
+            "OverlappingRequestError — new dates overlap another active request"
+          ]
+        },
+        {
+          "layer": "service",
+          "name": "cancel",
+          "command": "CancelLeaveRequestCommand",
+          "response": "LeaveRequestResponseDto",
+          "signature": "cancel(cmd: CancelLeaveRequestCommand, actor: ActorContext): Promise<LeaveRequestResponseDto>",
+          "steps": ["authorize (owner=employee_id or role=HR_ADMIN)", "load existing request", "domain: StateMachine.assertCancellable()", "if APPROVED: call LeaveBalanceService.restore()", "domain: set status=CANCELLED", "save", "call AuditService.append(CANCELLED)", "emit LeaveRequestCancelledEvent"],
+          "description": "Cancels a PENDING or APPROVED request; restores balance if APPROVED",
+          "errorConditions": [
+            "RequestNotFoundError — request does not exist",
+            "ForbiddenError — actor is not the owner or HR_ADMIN",
+            "InvalidStateError — request is already CANCELLED or REJECTED"
+          ]
+        },
+        {
+          "layer": "service",
+          "name": "approve",
+          "command": "ApproveLeaveRequestCommand",
+          "response": "LeaveRequestResponseDto",
+          "signature": "approve(cmd: ApproveLeaveRequestCommand, actor: ActorContext): Promise<LeaveRequestResponseDto>",
+          "steps": ["authorize (actor is direct manager of employee_id)", "load existing request", "domain: StateMachine.assertApprovable()", "call LeaveBalanceService.deduct()", "domain: set status=APPROVED, reviewed_by, reviewed_at, manager_comment", "save", "call AuditService.append(APPROVED)", "emit LeaveRequestApprovedEvent"],
+          "description": "Approves a PENDING request and deducts balance",
+          "errorConditions": [
+            "RequestNotFoundError — request does not exist",
+            "ForbiddenError — actor is not the direct manager",
+            "InvalidStateError — request is not PENDING"
+          ]
+        },
+        {
+          "layer": "service",
+          "name": "reject",
+          "command": "RejectLeaveRequestCommand",
+          "response": "LeaveRequestResponseDto",
+          "signature": "reject(cmd: RejectLeaveRequestCommand, actor: ActorContext): Promise<LeaveRequestResponseDto>",
+          "steps": ["authorize (actor is direct manager of employee_id)", "load existing request", "domain: StateMachine.assertRejectable()", "domain: set status=REJECTED, reviewed_by, reviewed_at, manager_comment", "save", "call AuditService.append(REJECTED)", "emit LeaveRequestRejectedEvent"],
+          "description": "Rejects a PENDING request with an optional comment",
+          "errorConditions": [
+            "RequestNotFoundError — request does not exist",
+            "ForbiddenError — actor is not the direct manager",
+            "InvalidStateError — request is not PENDING"
+          ]
+        }
+      ],
+      "query_service": [
+        {
+          "layer": "query_service",
+          "name": "getByEmployee",
+          "filters": "{ employeeId: string, status?: string, year?: number }",
+          "response": "LeaveRequestReadDto[]",
+          "signature": "getByEmployee(filters: { employeeId: string, status?: string, year?: number }): Promise<LeaveRequestReadDto[]>",
+          "description": "Returns all leave requests for an employee, optionally filtered by status and year",
+          "tablesJoined": ["leave_requests", "leave_types", "employees"]
+        },
+        {
+          "layer": "query_service",
+          "name": "getPendingForManager",
+          "filters": "{ managerId: string }",
+          "response": "LeaveRequestReadDto[]",
+          "signature": "getPendingForManager(filters: { managerId: string }): Promise<LeaveRequestReadDto[]>",
+          "description": "Returns all PENDING requests from direct reports of the given manager",
+          "tablesJoined": ["leave_requests", "employees", "leave_types"]
+        },
+        {
+          "layer": "query_service",
+          "name": "getAllForHrAdmin",
+          "filters": "{ status?: string, employeeId?: string, year?: number }",
+          "response": "LeaveRequestReadDto[]",
+          "signature": "getAllForHrAdmin(filters: { status?: string, employeeId?: string, year?: number }): Promise<LeaveRequestReadDto[]>",
+          "description": "Returns all leave requests system-wide with optional filters",
+          "tablesJoined": ["leave_requests", "employees", "leave_types"]
+        },
+        {
+          "layer": "query_service",
+          "name": "getById",
+          "filters": "{ id: string }",
+          "response": "LeaveRequestReadDto",
+          "signature": "getById(filters: { id: string }): Promise<LeaveRequestReadDto>",
+          "description": "Returns a single leave request by ID",
+          "tablesJoined": ["leave_requests", "leave_types", "employees"]
+        }
+      ]
+    },
+    "rules": [
+      { "id": "RULE-LR-01", "name": "AdvanceNoticeCheck",  "layer": "service", "artifact": "SubmitLeaveRequestService", "condition": "leave_type.advance_notice_days > 0 AND start_date < submitted_at + advance_notice_days", "action": "throw AdvanceNoticeViolationError", "elseAction": "proceed" },
+      { "id": "RULE-LR-02", "name": "OverlapCheck",        "layer": "domain",  "artifact": "LeaveRequestValidator",     "condition": "any PENDING or APPROVED request for same employee overlaps [start_date, end_date]", "action": "throw OverlappingRequestError", "elseAction": "proceed" },
+      { "id": "RULE-LR-03", "name": "BalanceRestore",      "layer": "service", "artifact": "CancelLeaveRequestService", "condition": "request.status == APPROVED at time of cancellation", "action": "call LeaveBalanceService.restore(employee_id, leave_type_id, total_days)", "elseAction": "skip restore" },
+      { "id": "RULE-LR-04", "name": "ReApprovalOnModify",  "layer": "domain",  "artifact": "LeaveRequestStateMachine",  "condition": "request.status == APPROVED and modify is called", "action": "reset status to PENDING and increment version", "elseAction": "keep status PENDING and increment version" },
+      { "id": "RULE-LR-05", "name": "ManagerAuthorization","layer": "service", "artifact": "ApproveLeaveRequestService / RejectLeaveRequestService", "condition": "actor.id != employee.manager_id", "action": "throw ForbiddenError", "elseAction": "proceed" }
+    ],
+    "stateMachine": {
+      "states": ["PENDING", "APPROVED", "REJECTED", "CANCELLED"],
+      "initial": "PENDING",
+      "transitions": [
+        { "from": "PENDING",  "to": "APPROVED",   "event": "approve",  "guard": "RULE-LR-05", "actions": ["set reviewed_by", "set reviewed_at", "set manager_comment", "call LeaveBalanceService.deduct()", "emit LeaveRequestApprovedEvent"] },
+        { "from": "PENDING",  "to": "REJECTED",   "event": "reject",   "guard": "RULE-LR-05", "actions": ["set reviewed_by", "set reviewed_at", "set manager_comment", "emit LeaveRequestRejectedEvent"] },
+        { "from": "PENDING",  "to": "CANCELLED",  "event": "cancel",   "guard": "none",       "actions": ["emit LeaveRequestCancelledEvent"] },
+        { "from": "PENDING",  "to": "PENDING",    "event": "modify",   "guard": "none",       "actions": ["increment version", "emit LeaveRequestModifiedEvent"] },
+        { "from": "APPROVED", "to": "CANCELLED",  "event": "cancel",   "guard": "none",       "actions": ["call LeaveBalanceService.restore()", "emit LeaveRequestCancelledEvent"] },
+        { "from": "APPROVED", "to": "PENDING",    "event": "modify",   "guard": "none",       "actions": ["call LeaveBalanceService.restore()", "call LeaveBalanceService.validateAndReserve()", "increment version", "emit LeaveRequestModifiedEvent"] }
+      ]
+    },
+    "api": [
+      { "method": "POST",   "path": "/api/leave-requests",              "requestDto": "LeaveRequestRequestDto",  "responseDto": "LeaveRequestResponseDto", "description": "Submit a new leave request" },
+      { "method": "GET",    "path": "/api/leave-requests",              "requestDto": null,                      "responseDto": "LeaveRequestReadDto[]",    "description": "List leave requests (scoped by actor role)" },
+      { "method": "GET",    "path": "/api/leave-requests/:id",          "requestDto": null,                      "responseDto": "LeaveRequestReadDto",      "description": "Get a single leave request by ID" },
+      { "method": "PUT",    "path": "/api/leave-requests/:id",          "requestDto": "LeaveRequestRequestDto",  "responseDto": "LeaveRequestResponseDto", "description": "Modify a PENDING or APPROVED leave request" },
+      { "method": "POST",   "path": "/api/leave-requests/:id/approve",  "requestDto": "ApproveLeaveRequestCommand","responseDto": "LeaveRequestResponseDto","description": "Approve a PENDING leave request" },
+      { "method": "POST",   "path": "/api/leave-requests/:id/reject",   "requestDto": "RejectLeaveRequestCommand", "responseDto": "LeaveRequestResponseDto","description": "Reject a PENDING leave request" },
+      { "method": "POST",   "path": "/api/leave-requests/:id/cancel",   "requestDto": "CancelLeaveRequestCommand", "responseDto": "LeaveRequestResponseDto","description": "Cancel a PENDING or APPROVED leave request" }
+    ],
+    "events": {
+      "published": [
+        { "eventType": "LeaveRequestSubmittedEvent",  "trigger": "submit",  "payloadFields": ["leaveRequestId", "employeeId", "managerId", "leaveTypeId", "startDate", "endDate", "totalDays"] },
+        { "eventType": "LeaveRequestApprovedEvent",   "trigger": "approve", "payloadFields": ["leaveRequestId", "employeeId", "reviewedBy", "managerComment"] },
+        { "eventType": "LeaveRequestRejectedEvent",   "trigger": "reject",  "payloadFields": ["leaveRequestId", "employeeId", "reviewedBy", "managerComment"] },
+        { "eventType": "LeaveRequestCancelledEvent",  "trigger": "cancel",  "payloadFields": ["leaveRequestId", "employeeId", "previousStatus", "balanceRestored"] },
+        { "eventType": "LeaveRequestModifiedEvent",   "trigger": "modify",  "payloadFields": ["leaveRequestId", "employeeId", "previousStatus", "newStartDate", "newEndDate"] }
+      ]
+    }
+  }
+}

@@ -1,0 +1,14 @@
+import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
+import { useQuery } from '@tanstack/react-query';
+import { leaveBalanceApi } from '@api/leave-balance';
+export const EmployeeBalances = () => {
+    const { data: balances = [], isLoading } = useQuery({
+        queryKey: ['allLeaveBalances'],
+        queryFn: () => leaveBalanceApi.getAll(),
+    });
+    if (isLoading) {
+        return _jsx(LoadingSpinner, {});
+    }
+    return (_jsxs("div", { className: "space-y-6", children: [_jsx("h1", { className: "text-3xl font-bold text-gray-900", children: "Employee Leave Balances" }), balances.length === 0 ? (_jsx("div", { className: "bg-gray-50 rounded-lg p-6 text-center text-gray-600", children: _jsx("p", { children: "No leave balances found." }) })) : (_jsx("div", { className: "bg-white rounded-lg shadow overflow-hidden", children: _jsxs("table", { className: "w-full", children: [_jsx("thead", { className: "bg-gray-50 border-b", children: _jsxs("tr", { children: [_jsx("th", { className: "px-6 py-3 text-left text-sm font-semibold text-gray-900", children: "Employee" }), _jsx("th", { className: "px-6 py-3 text-left text-sm font-semibold text-gray-900", children: "Leave Type" }), _jsx("th", { className: "px-6 py-3 text-left text-sm font-semibold text-gray-900", children: "Year" }), _jsx("th", { className: "px-6 py-3 text-left text-sm font-semibold text-gray-900", children: "Total Days" }), _jsx("th", { className: "px-6 py-3 text-left text-sm font-semibold text-gray-900", children: "Used Days" }), _jsx("th", { className: "px-6 py-3 text-left text-sm font-semibold text-gray-900", children: "Pending Days" }), _jsx("th", { className: "px-6 py-3 text-left text-sm font-semibold text-gray-900", children: "Available Days" })] }) }), _jsx("tbody", { className: "divide-y", children: balances.map((balance) => (_jsxs("tr", { className: "hover:bg-gray-50", children: [_jsx("td", { className: "px-6 py-3 text-sm text-gray-900", children: balance.employeeId }), _jsx("td", { className: "px-6 py-3 text-sm text-gray-600", children: balance.leaveTypeId }), _jsx("td", { className: "px-6 py-3 text-sm text-gray-600", children: balance.periodYear }), _jsx("td", { className: "px-6 py-3 text-sm text-gray-900 font-semibold", children: balance.totalDays }), _jsx("td", { className: "px-6 py-3 text-sm text-orange-600 font-semibold", children: balance.usedDays }), _jsx("td", { className: "px-6 py-3 text-sm text-yellow-600 font-semibold", children: balance.pendingDays }), _jsx("td", { className: "px-6 py-3 text-sm text-green-600 font-semibold", children: balance.totalDays - balance.usedDays - balance.pendingDays })] }, balance.id))) })] }) }))] }));
+};
+const LoadingSpinner = () => (_jsx("div", { className: "flex items-center justify-center h-64", children: _jsx("div", { className: "animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600" }) }));

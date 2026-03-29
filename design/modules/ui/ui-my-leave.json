@@ -1,0 +1,292 @@
+{
+  "moduleId": "UI-M01",
+  "moduleName": "My Leave",
+  "routePrefix": "/my-leave",
+  "purpose": "Enables an Employee to view their leave balances and history, submit new leave requests, and modify or cancel existing ones.",
+  "primaryUsers": ["Employee"],
+  "backendModules": ["MOD-004", "MOD-003", "MOD-002"],
+  "pages": [
+    {
+      "id": "/my-leave/dashboard",
+      "name": "My Leave Dashboard",
+      "routePath": "/dashboard",
+      "pattern": "dashboard",
+      "purpose": "Gives the Employee an at-a-glance summary of their current leave balances, any active requests, and quick access to submit a new request or browse all requests.",
+      "requirementRefs": ["FR-001", "FR-002", "FR-015"],
+      "businessFunctionRef": "BF-001",
+      "requiredRoles": ["Employee"],
+      "shows": [
+        "Balance summary cards per leave type (total, used, pending, available days)",
+        "List of active requests (PENDING / APPROVED) with status badges",
+        "Quick-action button to submit a new leave request"
+      ],
+      "actions": [
+        {
+          "label": "New Request",
+          "type": "navigate",
+          "navigatesTo": "/my-leave/new"
+        },
+        {
+          "label": "View All Requests",
+          "type": "navigate",
+          "navigatesTo": "/my-leave/requests"
+        }
+      ],
+      "filters": [],
+      "relatedEntities": ["LeaveBalance", "LeaveRequest", "LeaveType"],
+      "validation": [],
+      "emptyState": "You have no active leave requests. Click 'New Request' to submit one.",
+      "drillsInto": ["/my-leave/new", "/my-leave/requests"]
+    },
+    {
+      "id": "/my-leave/new",
+      "name": "Submit Leave Request",
+      "routePath": "/new",
+      "pattern": "form",
+      "purpose": "Allows the Employee to select a leave type, specify dates and an optional reason, and submit a new leave request for manager approval.",
+      "requirementRefs": ["FR-001", "FR-002", "FR-003", "FR-004", "FR-005"],
+      "businessFunctionRef": "BF-001",
+      "requiredRoles": ["Employee"],
+      "shows": [
+        "Leave type selector (active types only)",
+        "Start date picker",
+        "End date picker",
+        "Calculated total days (read-only, auto-computed)",
+        "Available balance for selected leave type (read-only)",
+        "Reason text field (optional)",
+        "Advance notice requirement hint for selected leave type",
+        "Inline validation messages for balance, advance notice, and overlap"
+      ],
+      "actions": [
+        {
+          "label": "Submit Request",
+          "type": "submit",
+          "navigatesTo": "/my-leave/dashboard"
+        },
+        {
+          "label": "Cancel",
+          "type": "navigate",
+          "navigatesTo": "/my-leave/dashboard"
+        }
+      ],
+      "filters": [],
+      "relatedEntities": ["LeaveRequest", "LeaveType", "LeaveBalance"],
+      "validation": [
+        {
+          "field": "leaveType",
+          "rule": "required",
+          "message": "Please select a leave type."
+        },
+        {
+          "field": "startDate",
+          "rule": "required",
+          "message": "Please select a start date."
+        },
+        {
+          "field": "endDate",
+          "rule": "required",
+          "message": "Please select an end date."
+        },
+        {
+          "field": "endDate",
+          "rule": "pattern",
+          "message": "End date must be on or after the start date."
+        },
+        {
+          "field": "startDate",
+          "rule": "pattern",
+          "message": "Start date does not meet the advance notice requirement for the selected leave type."
+        },
+        {
+          "field": "startDate",
+          "rule": "pattern",
+          "message": "The requested dates overlap with an existing pending or approved request."
+        },
+        {
+          "field": "leaveType",
+          "rule": "pattern",
+          "message": "Insufficient balance for the selected leave type. Available: {availableDays} days."
+        }
+      ],
+      "emptyState": null,
+      "drillsInto": []
+    },
+    {
+      "id": "/my-leave/requests",
+      "name": "My Requests",
+      "routePath": "/requests",
+      "pattern": "list",
+      "purpose": "Shows the Employee the full list of their leave requests with filtering and drill-through to request details.",
+      "requirementRefs": ["FR-015", "FR-010", "FR-011", "FR-012"],
+      "businessFunctionRef": "BF-010",
+      "requiredRoles": ["Employee"],
+      "shows": [
+        "Leave type",
+        "Start date",
+        "End date",
+        "Total days",
+        "Status badge (PENDING / APPROVED / REJECTED / CANCELLED)",
+        "Submitted date"
+      ],
+      "actions": [
+        {
+          "label": "New Request",
+          "type": "navigate",
+          "navigatesTo": "/my-leave/new"
+        },
+        {
+          "label": "View",
+          "type": "navigate",
+          "navigatesTo": "/my-leave/requests/:id"
+        }
+      ],
+      "filters": [
+        {
+          "field": "status",
+          "type": "select",
+          "default": null
+        },
+        {
+          "field": "leaveType",
+          "type": "select",
+          "default": null
+        },
+        {
+          "field": "dateRange",
+          "type": "date-range",
+          "default": null
+        }
+      ],
+      "relatedEntities": ["LeaveRequest", "LeaveType"],
+      "validation": [],
+      "emptyState": "You have no leave requests. Click 'New Request' to submit one.",
+      "drillsInto": ["/my-leave/requests/:id"]
+    },
+    {
+      "id": "/my-leave/requests/:id",
+      "name": "Request Detail",
+      "routePath": "/requests/:id",
+      "pattern": "detail",
+      "purpose": "Displays all details of a single leave request and allows the Employee to modify or cancel it if eligible.",
+      "requirementRefs": ["FR-010", "FR-011", "FR-012", "FR-015"],
+      "businessFunctionRef": "BF-002",
+      "requiredRoles": ["Employee"],
+      "shows": [
+        "Leave type",
+        "Start date and end date",
+        "Total days",
+        "Status and status history",
+        "Optional reason",
+        "Manager comment (if reviewed)",
+        "Submitted date",
+        "Last updated date"
+      ],
+      "actions": [
+        {
+          "label": "Modify Request",
+          "type": "navigate",
+          "navigatesTo": "/my-leave/requests/:id/edit"
+        },
+        {
+          "label": "Cancel Request",
+          "type": "confirm",
+          "navigatesTo": "/my-leave/requests"
+        },
+        {
+          "label": "Back to My Requests",
+          "type": "navigate",
+          "navigatesTo": "/my-leave/requests"
+        }
+      ],
+      "filters": [],
+      "relatedEntities": ["LeaveRequest", "LeaveType"],
+      "validation": [],
+      "emptyState": null,
+      "drillsInto": ["/my-leave/requests/:id/edit"]
+    },
+    {
+      "id": "/my-leave/requests/:id/edit",
+      "name": "Modify Leave Request",
+      "routePath": "/requests/:id/edit",
+      "pattern": "form",
+      "purpose": "Allows the Employee to update the dates or reason of a PENDING or APPROVED leave request, with re-validation applied.",
+      "requirementRefs": ["FR-010", "BR-005", "FR-013d", "FR-013e"],
+      "businessFunctionRef": "BF-002",
+      "requiredRoles": ["Employee"],
+      "shows": [
+        "Leave type (read-only)",
+        "Start date picker (pre-filled)",
+        "End date picker (pre-filled)",
+        "Calculated total days (read-only, auto-computed)",
+        "Available balance for leave type (read-only)",
+        "Reason text field (optional, pre-filled)",
+        "Warning banner if modifying an approved request (will require re-approval)"
+      ],
+      "actions": [
+        {
+          "label": "Save Changes",
+          "type": "submit",
+          "navigatesTo": "/my-leave/requests/:id"
+        },
+        {
+          "label": "Cancel",
+          "type": "navigate",
+          "navigatesTo": "/my-leave/requests/:id"
+        }
+      ],
+      "filters": [],
+      "relatedEntities": ["LeaveRequest", "LeaveType", "LeaveBalance"],
+      "validation": [
+        {
+          "field": "startDate",
+          "rule": "required",
+          "message": "Please select a start date."
+        },
+        {
+          "field": "endDate",
+          "rule": "required",
+          "message": "Please select an end date."
+        },
+        {
+          "field": "endDate",
+          "rule": "pattern",
+          "message": "End date must be on or after the start date."
+        },
+        {
+          "field": "startDate",
+          "rule": "pattern",
+          "message": "Updated start date does not meet the advance notice requirement for the selected leave type."
+        },
+        {
+          "field": "startDate",
+          "rule": "pattern",
+          "message": "Updated dates overlap with another pending or approved request."
+        },
+        {
+          "field": "startDate",
+          "rule": "pattern",
+          "message": "Insufficient balance for the updated date range."
+        }
+      ],
+      "emptyState": null,
+      "drillsInto": []
+    }
+  ],
+  "navigation": {
+    "entryPoint": "/my-leave/dashboard",
+    "menuVisible": true,
+    "flows": [
+      { "from": "/my-leave/dashboard", "to": "/my-leave/new", "via": "New Request" },
+      { "from": "/my-leave/dashboard", "to": "/my-leave/requests", "via": "View All Requests" },
+      { "from": "/my-leave/new", "to": "/my-leave/dashboard", "via": "Submit Request" },
+      { "from": "/my-leave/new", "to": "/my-leave/dashboard", "via": "Cancel" },
+      { "from": "/my-leave/requests", "to": "/my-leave/new", "via": "New Request" },
+      { "from": "/my-leave/requests", "to": "/my-leave/requests/:id", "via": "View" },
+      { "from": "/my-leave/requests/:id", "to": "/my-leave/requests/:id/edit", "via": "Modify Request" },
+      { "from": "/my-leave/requests/:id", "to": "/my-leave/requests", "via": "Cancel Request" },
+      { "from": "/my-leave/requests/:id", "to": "/my-leave/requests", "via": "Back to My Requests" },
+      { "from": "/my-leave/requests/:id/edit", "to": "/my-leave/requests/:id", "via": "Save Changes" },
+      { "from": "/my-leave/requests/:id/edit", "to": "/my-leave/requests/:id", "via": "Cancel" }
+    ]
+  }
+}

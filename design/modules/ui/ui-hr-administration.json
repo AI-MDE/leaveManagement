@@ -1,0 +1,504 @@
+{
+  "moduleId": "UI-M03",
+  "moduleName": "HR Administration",
+  "routePrefix": "/hr-administration",
+  "purpose": "Enables HR Admin to manage leave types, set employee balances, oversee all requests system-wide, and review the audit trail.",
+  "primaryUsers": ["HR Admin"],
+  "backendModules": ["MOD-002", "MOD-003", "MOD-004", "MOD-005", "MOD-006", "MOD-001"],
+  "pages": [
+    {
+      "id": "/hr-administration/leave-types",
+      "name": "Leave Types",
+      "routePath": "/leave-types",
+      "pattern": "list",
+      "purpose": "Shows HR Admin the full catalogue of leave types with their rules, and allows creation or navigation to edit/deactivate.",
+      "requirementRefs": ["FR-004", "LT-001", "LT-002", "LT-003", "LT-004"],
+      "businessFunctionRef": "BF-008",
+      "requiredRoles": ["HR Admin"],
+      "shows": [
+        "Leave type name",
+        "Code",
+        "Advance notice days",
+        "Requires balance flag",
+        "Active / inactive status"
+      ],
+      "actions": [
+        {
+          "label": "New Leave Type",
+          "type": "navigate",
+          "navigatesTo": "/hr-administration/leave-types/new"
+        },
+        {
+          "label": "Edit",
+          "type": "navigate",
+          "navigatesTo": "/hr-administration/leave-types/:id/edit"
+        },
+        {
+          "label": "Deactivate",
+          "type": "confirm",
+          "navigatesTo": null
+        }
+      ],
+      "filters": [
+        {
+          "field": "isActive",
+          "type": "boolean",
+          "default": true
+        }
+      ],
+      "relatedEntities": ["LeaveType"],
+      "validation": [],
+      "emptyState": "No leave types configured. Click 'New Leave Type' to add one.",
+      "drillsInto": ["/hr-administration/leave-types/new", "/hr-administration/leave-types/:id/edit"]
+    },
+    {
+      "id": "/hr-administration/leave-types/new",
+      "name": "New Leave Type",
+      "routePath": "/leave-types/new",
+      "pattern": "form",
+      "purpose": "Allows HR Admin to create a new leave type with its code, name, advance notice requirement, and balance flag.",
+      "requirementRefs": ["FR-004", "BR-002"],
+      "businessFunctionRef": "BF-008",
+      "requiredRoles": ["HR Admin"],
+      "shows": [
+        "Name field",
+        "Code field",
+        "Advance notice days field",
+        "Requires balance toggle",
+        "Active toggle (defaulted to active)"
+      ],
+      "actions": [
+        {
+          "label": "Save",
+          "type": "submit",
+          "navigatesTo": "/hr-administration/leave-types"
+        },
+        {
+          "label": "Cancel",
+          "type": "navigate",
+          "navigatesTo": "/hr-administration/leave-types"
+        }
+      ],
+      "filters": [],
+      "relatedEntities": ["LeaveType"],
+      "validation": [
+        {
+          "field": "name",
+          "rule": "required",
+          "message": "Leave type name is required."
+        },
+        {
+          "field": "code",
+          "rule": "required",
+          "message": "Leave type code is required."
+        },
+        {
+          "field": "code",
+          "rule": "unique",
+          "message": "This leave type code already exists. Please choose a unique code."
+        },
+        {
+          "field": "advanceNoticeDays",
+          "rule": "required",
+          "message": "Advance notice days is required. Enter 0 if no advance notice is needed."
+        },
+        {
+          "field": "requiresBalance",
+          "rule": "required",
+          "message": "Please indicate whether this leave type requires a balance."
+        }
+      ],
+      "emptyState": null,
+      "drillsInto": []
+    },
+    {
+      "id": "/hr-administration/leave-types/:id/edit",
+      "name": "Edit Leave Type",
+      "routePath": "/leave-types/:id/edit",
+      "pattern": "form",
+      "purpose": "Allows HR Admin to update the details or deactivate an existing leave type.",
+      "requirementRefs": ["FR-004", "BR-002"],
+      "businessFunctionRef": "BF-008",
+      "requiredRoles": ["HR Admin"],
+      "shows": [
+        "Name field (pre-filled)",
+        "Code field (pre-filled)",
+        "Advance notice days field (pre-filled)",
+        "Requires balance toggle (pre-filled)",
+        "Active toggle"
+      ],
+      "actions": [
+        {
+          "label": "Save Changes",
+          "type": "submit",
+          "navigatesTo": "/hr-administration/leave-types"
+        },
+        {
+          "label": "Cancel",
+          "type": "navigate",
+          "navigatesTo": "/hr-administration/leave-types"
+        }
+      ],
+      "filters": [],
+      "relatedEntities": ["LeaveType"],
+      "validation": [
+        {
+          "field": "name",
+          "rule": "required",
+          "message": "Leave type name is required."
+        },
+        {
+          "field": "code",
+          "rule": "required",
+          "message": "Leave type code is required."
+        },
+        {
+          "field": "code",
+          "rule": "unique",
+          "message": "This leave type code already exists. Please choose a unique code."
+        },
+        {
+          "field": "advanceNoticeDays",
+          "rule": "required",
+          "message": "Advance notice days is required. Enter 0 if no advance notice is needed."
+        },
+        {
+          "field": "requiresBalance",
+          "rule": "required",
+          "message": "Please indicate whether this leave type requires a balance."
+        }
+      ],
+      "emptyState": null,
+      "drillsInto": []
+    },
+    {
+      "id": "/hr-administration/balances",
+      "name": "Employee Balances",
+      "routePath": "/balances",
+      "pattern": "list",
+      "purpose": "Shows HR Admin the current leave balance entitlements across all employees and leave types, with the ability to drill into a single employee or set/adjust balances.",
+      "requirementRefs": ["FR-002", "FR-003", "BR-001"],
+      "businessFunctionRef": "BF-007",
+      "requiredRoles": ["HR Admin"],
+      "shows": [
+        "Employee name",
+        "Leave type",
+        "Year",
+        "Total entitlement days",
+        "Used days",
+        "Pending days",
+        "Available days"
+      ],
+      "actions": [
+        {
+          "label": "Set / Adjust Balance",
+          "type": "navigate",
+          "navigatesTo": "/hr-administration/balances/edit"
+        },
+        {
+          "label": "View Employee Detail",
+          "type": "navigate",
+          "navigatesTo": "/hr-administration/balances/:employeeId"
+        }
+      ],
+      "filters": [
+        {
+          "field": "employee",
+          "type": "text",
+          "default": null
+        },
+        {
+          "field": "leaveType",
+          "type": "select",
+          "default": null
+        },
+        {
+          "field": "year",
+          "type": "select",
+          "default": null
+        }
+      ],
+      "relatedEntities": ["LeaveBalance", "Employee", "LeaveType"],
+      "validation": [],
+      "emptyState": "No balances found. Use 'Set / Adjust Balance' to configure entitlements for employees.",
+      "drillsInto": ["/hr-administration/balances/edit", "/hr-administration/balances/:employeeId"]
+    },
+    {
+      "id": "/hr-administration/balances/edit",
+      "name": "Set Employee Balance",
+      "routePath": "/balances/edit",
+      "pattern": "form",
+      "purpose": "Allows HR Admin to create or update the leave balance entitlement for a specific employee, leave type, and year.",
+      "requirementRefs": ["FR-002", "BR-001"],
+      "businessFunctionRef": "BF-007",
+      "requiredRoles": ["HR Admin"],
+      "shows": [
+        "Employee selector",
+        "Leave type selector",
+        "Year field",
+        "Total days entitlement field",
+        "Read-only: existing used days (if record exists)",
+        "Read-only: existing pending days (if record exists)"
+      ],
+      "actions": [
+        {
+          "label": "Save Balance",
+          "type": "submit",
+          "navigatesTo": "/hr-administration/balances"
+        },
+        {
+          "label": "Cancel",
+          "type": "navigate",
+          "navigatesTo": "/hr-administration/balances"
+        }
+      ],
+      "filters": [],
+      "relatedEntities": ["LeaveBalance", "Employee", "LeaveType"],
+      "validation": [
+        {
+          "field": "employee",
+          "rule": "required",
+          "message": "Please select an employee."
+        },
+        {
+          "field": "leaveType",
+          "rule": "required",
+          "message": "Please select a leave type."
+        },
+        {
+          "field": "year",
+          "rule": "required",
+          "message": "Please specify the leave year."
+        },
+        {
+          "field": "totalDays",
+          "rule": "required",
+          "message": "Total entitlement days is required."
+        },
+        {
+          "field": "totalDays",
+          "rule": "pattern",
+          "message": "Total entitlement days must be a non-negative number."
+        }
+      ],
+      "emptyState": null,
+      "drillsInto": []
+    },
+    {
+      "id": "/hr-administration/balances/:employeeId",
+      "name": "Employee Balance Detail",
+      "routePath": "/balances/:employeeId",
+      "pattern": "detail",
+      "purpose": "Shows HR Admin the complete balance breakdown for a single employee across all leave types and years.",
+      "requirementRefs": ["FR-002", "FR-003", "BR-001"],
+      "businessFunctionRef": "BF-007",
+      "requiredRoles": ["HR Admin"],
+      "shows": [
+        "Employee name and email",
+        "Balance table: leave type, year, total, used, pending, available",
+        "History of balance adjustments"
+      ],
+      "actions": [
+        {
+          "label": "Set / Adjust Balance",
+          "type": "navigate",
+          "navigatesTo": "/hr-administration/balances/edit"
+        },
+        {
+          "label": "Back to Balances",
+          "type": "navigate",
+          "navigatesTo": "/hr-administration/balances"
+        }
+      ],
+      "filters": [],
+      "relatedEntities": ["LeaveBalance", "Employee", "LeaveType"],
+      "validation": [],
+      "emptyState": "No balances configured for this employee.",
+      "drillsInto": ["/hr-administration/balances/edit"]
+    },
+    {
+      "id": "/hr-administration/requests",
+      "name": "All Leave Requests",
+      "routePath": "/requests",
+      "pattern": "list",
+      "purpose": "Shows HR Admin all leave requests system-wide, filterable by employee, status, type, and date range, with drill-through to details and override actions.",
+      "requirementRefs": ["FR-015", "FR-009"],
+      "businessFunctionRef": "BF-010",
+      "requiredRoles": ["HR Admin"],
+      "shows": [
+        "Employee name",
+        "Leave type",
+        "Start date",
+        "End date",
+        "Total days",
+        "Status badge",
+        "Submitted date",
+        "Manager who reviewed"
+      ],
+      "actions": [
+        {
+          "label": "View Detail",
+          "type": "navigate",
+          "navigatesTo": "/hr-administration/requests/:id"
+        },
+        {
+          "label": "Export",
+          "type": "export",
+          "navigatesTo": null
+        }
+      ],
+      "filters": [
+        {
+          "field": "employee",
+          "type": "text",
+          "default": null
+        },
+        {
+          "field": "status",
+          "type": "select",
+          "default": null
+        },
+        {
+          "field": "leaveType",
+          "type": "select",
+          "default": null
+        },
+        {
+          "field": "dateRange",
+          "type": "date-range",
+          "default": null
+        }
+      ],
+      "relatedEntities": ["LeaveRequest", "Employee", "LeaveType"],
+      "validation": [],
+      "emptyState": "No leave requests found matching the selected filters.",
+      "drillsInto": ["/hr-administration/requests/:id"]
+    },
+    {
+      "id": "/hr-administration/requests/:id",
+      "name": "Request Detail (HR View)",
+      "routePath": "/requests/:id",
+      "pattern": "detail",
+      "purpose": "Shows HR Admin all details and the full audit trail of a single leave request, with override cancel action available.",
+      "requirementRefs": ["FR-009", "FR-015", "FR-016", "FR-012"],
+      "businessFunctionRef": "BF-011",
+      "requiredRoles": ["HR Admin"],
+      "shows": [
+        "Employee name and manager",
+        "Leave type",
+        "Start date and end date",
+        "Total days",
+        "Status",
+        "Optional reason",
+        "Manager comment",
+        "Request version",
+        "Audit trail timeline (actor, action, from status, to status, timestamp, optional comment)"
+      ],
+      "actions": [
+        {
+          "label": "Override Cancel",
+          "type": "confirm",
+          "navigatesTo": "/hr-administration/requests"
+        },
+        {
+          "label": "Back to All Requests",
+          "type": "navigate",
+          "navigatesTo": "/hr-administration/requests"
+        }
+      ],
+      "filters": [],
+      "relatedEntities": ["LeaveRequest", "LeaveAuditEntry", "Employee", "LeaveType"],
+      "validation": [],
+      "emptyState": null,
+      "drillsInto": []
+    },
+    {
+      "id": "/hr-administration/audit",
+      "name": "Audit Trail",
+      "routePath": "/audit",
+      "pattern": "list",
+      "purpose": "Provides HR Admin with a searchable, read-only view of the complete system-wide audit log across all leave requests.",
+      "requirementRefs": ["FR-016", "NFR-002"],
+      "businessFunctionRef": "BF-011",
+      "requiredRoles": ["HR Admin"],
+      "shows": [
+        "Occurred at timestamp",
+        "Leave request ID",
+        "Employee name",
+        "Action (SUBMITTED / APPROVED / REJECTED / CANCELLED / MODIFIED / BALANCE_RESTORED)",
+        "From status",
+        "To status",
+        "Actor name",
+        "Optional comment"
+      ],
+      "actions": [
+        {
+          "label": "View Request",
+          "type": "navigate",
+          "navigatesTo": "/hr-administration/requests/:id"
+        }
+      ],
+      "filters": [
+        {
+          "field": "employee",
+          "type": "text",
+          "default": null
+        },
+        {
+          "field": "action",
+          "type": "select",
+          "default": null
+        },
+        {
+          "field": "dateRange",
+          "type": "date-range",
+          "default": null
+        }
+      ],
+      "relatedEntities": ["LeaveAuditEntry", "LeaveRequest", "Employee"],
+      "validation": [],
+      "emptyState": "No audit entries found matching the selected filters.",
+      "drillsInto": ["/hr-administration/requests/:id"]
+    }
+  ],
+  "subNav": [
+    {
+      "label": "Leave Types",
+      "route": "/hr-administration/leave-types"
+    },
+    {
+      "label": "Balances",
+      "route": "/hr-administration/balances"
+    },
+    {
+      "label": "Requests",
+      "route": "/hr-administration/requests"
+    },
+    {
+      "label": "Audit Trail",
+      "route": "/hr-administration/audit"
+    }
+  ],
+  "navigation": {
+    "entryPoint": "/hr-administration/leave-types",
+    "menuVisible": true,
+    "flows": [
+      { "from": "/hr-administration/leave-types", "to": "/hr-administration/leave-types/new", "via": "New Leave Type" },
+      { "from": "/hr-administration/leave-types", "to": "/hr-administration/leave-types/:id/edit", "via": "Edit" },
+      { "from": "/hr-administration/leave-types/new", "to": "/hr-administration/leave-types", "via": "Save" },
+      { "from": "/hr-administration/leave-types/new", "to": "/hr-administration/leave-types", "via": "Cancel" },
+      { "from": "/hr-administration/leave-types/:id/edit", "to": "/hr-administration/leave-types", "via": "Save Changes" },
+      { "from": "/hr-administration/leave-types/:id/edit", "to": "/hr-administration/leave-types", "via": "Cancel" },
+      { "from": "/hr-administration/balances", "to": "/hr-administration/balances/edit", "via": "Set / Adjust Balance" },
+      { "from": "/hr-administration/balances", "to": "/hr-administration/balances/:employeeId", "via": "View Employee Detail" },
+      { "from": "/hr-administration/balances/edit", "to": "/hr-administration/balances", "via": "Save Balance" },
+      { "from": "/hr-administration/balances/edit", "to": "/hr-administration/balances", "via": "Cancel" },
+      { "from": "/hr-administration/balances/:employeeId", "to": "/hr-administration/balances/edit", "via": "Set / Adjust Balance" },
+      { "from": "/hr-administration/balances/:employeeId", "to": "/hr-administration/balances", "via": "Back to Balances" },
+      { "from": "/hr-administration/requests", "to": "/hr-administration/requests/:id", "via": "View Detail" },
+      { "from": "/hr-administration/requests/:id", "to": "/hr-administration/requests", "via": "Override Cancel" },
+      { "from": "/hr-administration/requests/:id", "to": "/hr-administration/requests", "via": "Back to All Requests" },
+      { "from": "/hr-administration/audit", "to": "/hr-administration/requests/:id", "via": "View Request" }
+    ]
+  }
+}

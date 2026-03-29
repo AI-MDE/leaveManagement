@@ -1,0 +1,40 @@
+{
+  "skill": "ui_source_code_generation",
+  "generatedAt": "2026-03-29T23:56:40.936Z",
+  "config": "configuration.json",
+  "commandMappings": [],
+  "inputs": {
+    "declaredPatterns": [
+      "C:\\dev\\leaveManagement\\configuration.json",
+      "/dev/leaveManagement/application/application.json",
+      "/dev/leaveManagement/design/modules/ui/ui-catalog.json",
+      "/dev/leaveManagement/design/modules/ui/ui-*.json",
+      "/dev/leaveManagement/design/modules/module-catalog.json",
+      "/dev/leaveManagement/design/entities/ent-*.json",
+      "/dev/ai-mde/architecture/architecture.json"
+    ],
+    "includedFiles": [
+      "../ai-mde/architecture/architecture.json",
+      "application/application.json",
+      "configuration.json",
+      "design/entities/ent-employee.json",
+      "design/entities/ent-leave-audit-entry.json",
+      "design/entities/ent-leave-balance.json",
+      "design/entities/ent-leave-request.json",
+      "design/entities/ent-leave-type.json",
+      "design/entities/ent-notification.json",
+      "design/modules/module-catalog.json",
+      "design/modules/ui/ui-catalog.json",
+      "design/modules/ui/ui-hr-administration.json",
+      "design/modules/ui/ui-my-leave.json",
+      "design/modules/ui/ui-team-approvals.json"
+    ],
+    "missingPatterns": []
+  },
+  "outputPaths": {
+    "debugDir": "debug/ui_source_code_generation",
+    "prompt": "debug/ui_source_code_generation/ai-prompt.txt",
+    "zip": "debug/ui_source_code_generation/inputs.zip"
+  },
+  "project": null
+}

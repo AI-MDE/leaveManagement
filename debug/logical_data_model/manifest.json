@@ -1,0 +1,25 @@
+{
+  "skill": "logical_data_model",
+  "generatedAt": "2026-03-29T23:54:14.120Z",
+  "config": "configuration.json",
+  "commandMappings": [],
+  "inputs": {
+    "declaredPatterns": [
+      "/dev/leaveManagement/ba/requirements.md",
+      "/dev/leaveManagement/ba/glossary.md",
+      "/dev/leaveManagement/design/application_architecture.json"
+    ],
+    "includedFiles": [
+      "ba/glossary.md",
+      "ba/requirements.md",
+      "design/application_architecture.json"
+    ],
+    "missingPatterns": []
+  },
+  "outputPaths": {
+    "debugDir": "debug/logical_data_model",
+    "prompt": "debug/logical_data_model/ai-prompt.txt",
+    "zip": "debug/logical_data_model/inputs.zip"
+  },
+  "project": null
+}

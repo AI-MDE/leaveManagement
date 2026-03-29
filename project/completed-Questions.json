@@ -1,0 +1,47 @@
+[
+  {
+    "id": "Q-001",
+    "category": "business_rules",
+    "question": "What leave types does the system need to support, and which ones require advance notice — and how much notice?",
+    "response": "Annual Leave (14 days notice), Sick Leave (no notice required), Unpaid Leave (30 days notice), Maternity/Paternity Leave (30 days notice)",
+    "accepted": true,
+    "resolution": "Added LT-001 through LT-004; updated FR-004 and BR-002 with per-type advance notice rules.",
+    "date_accepted": "2026-03-27"
+  },
+  {
+    "id": "Q-002",
+    "category": "business_rules",
+    "question": "Does the 'no overlapping leave' rule apply per employee only, or also across the team?",
+    "response": "Per employee only — overlapping requests for the same employee are blocked; team capacity is visible to managers but not enforced by the system",
+    "accepted": true,
+    "resolution": "Updated FR-005 and BR-003 to reflect per-employee overlap enforcement. Team capacity is informational only.",
+    "date_accepted": "2026-03-27"
+  },
+  {
+    "id": "Q-003",
+    "category": "workflow_process",
+    "question": "Is the approval chain single-level or multi-level?",
+    "response": "Single-level: employee submits to direct manager. HR Admin can override or intervene but is not part of the standard approval chain.",
+    "accepted": true,
+    "resolution": "Updated FR-009. Approval chain is single-level. HR Admin override is a separate capability.",
+    "date_accepted": "2026-03-27"
+  },
+  {
+    "id": "Q-004",
+    "category": "workflow_process",
+    "question": "Can an employee modify or cancel a leave request that has already been approved? If so, does it require re-approval?",
+    "response": "Employees can cancel approved leave; cancellation triggers a notification to the manager and the balance is restored. Modification of approved leave requires re-approval.",
+    "accepted": true,
+    "resolution": "Updated FR-010, FR-012, BR-004, and BR-005 to reflect cancellation with balance restore and re-approval for modification.",
+    "date_accepted": "2026-03-27"
+  },
+  {
+    "id": "Q-005",
+    "category": "stakeholders_roles",
+    "question": "What are the notification triggers and channels?",
+    "response": "Email notifications only. Submission: notify manager. Approval/rejection: notify employee. Cancellation: notify manager. Modification: notify manager if pending, notify manager and HR Admin if approved.",
+    "accepted": true,
+    "resolution": "Updated FR-013 with full event-to-recipient matrix. Channel is email only.",
+    "date_accepted": "2026-03-27"
+  }
+]

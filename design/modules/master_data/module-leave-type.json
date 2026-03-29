@@ -1,0 +1,116 @@
+{
+  "moduleId": "MOD-003",
+  "moduleName": "LeaveType",
+  "table": "leave_types",
+  "moduleType": "master_data",
+  "entityRef": "design/entities/ent-leave-type.json",
+  "generates": ["dto", "data_access", "domain", "service", "query_service"],
+  "optimisticLocking": true,
+  "auditRequired": false,
+  "charter": {
+    "responsibilities": [
+      "Own the leave type catalogue: code, name, advance notice days, requires_balance flag",
+      "Enforce code uniqueness across leave types",
+      "Provide advance notice and balance requirement data to leave-request at submission time",
+      "Allow HR Admin to activate/deactivate leave types"
+    ],
+    "exclusions": [
+      "Leave request validation logic — owned by MOD-001 leave-request",
+      "Balance tracking — owned by MOD-004 leave-balance"
+    ],
+    "dependencies": [],
+    "requirementMapping": [
+      { "ruleId": "BR-002", "mappedTo": "data_access", "artifact": "LeaveTypeRepository", "description": "advance_notice_days stored here; read by leave-request service at submission" },
+      { "ruleId": "FR-004", "mappedTo": "domain",       "artifact": "LeaveTypeEntity",     "description": "Entity enforces advance_notice_days >= 0 invariant" }
+    ]
+  },
+  "spec": {
+    "schema": {
+      "table": "leave_types",
+      "columns": [
+        { "name": "id",                  "type": "uuid",    "required": true,  "default": "gen_random_uuid()" },
+        { "name": "code",                "type": "string",  "required": true,  "default": null, "description": "Unique business key e.g. ANNUAL, SICK" },
+        { "name": "name",                "type": "string",  "required": true,  "default": null },
+        { "name": "advance_notice_days", "type": "integer", "required": true,  "default": 0 },
+        { "name": "requires_balance",    "type": "boolean", "required": true,  "default": true },
+        { "name": "is_active",           "type": "boolean", "required": true,  "default": true },
+        { "name": "created_at",          "type": "datetime","required": true,  "default": "now()" },
+        { "name": "updated_at",          "type": "datetime","required": true,  "default": "now()" }
+      ],
+      "indexes": [
+        { "fields": ["code"],      "unique": true,  "description": "Business key uniqueness" },
+        { "fields": ["is_active"], "unique": false, "description": "Active type filtering" }
+      ]
+    },
+    "interfaces": {
+      "service": [
+        {
+          "layer": "service",
+          "name": "create",
+          "command": "CreateLeaveTypeCommand",
+          "response": "LeaveTypeResponseDto",
+          "signature": "create(cmd: CreateLeaveTypeCommand, actor: ActorContext): Promise<LeaveTypeResponseDto>",
+          "steps": ["authorize (role=HR_ADMIN)", "validate code uniqueness", "domain: LeaveTypeEntity.create()", "save"],
+          "description": "Creates a new leave type",
+          "errorConditions": [
+            "ForbiddenError — actor is not HR_ADMIN",
+            "DuplicateCodeError — code already exists"
+          ]
+        },
+        {
+          "layer": "service",
+          "name": "update",
+          "command": "UpdateLeaveTypeCommand",
+          "response": "LeaveTypeResponseDto",
+          "signature": "update(cmd: UpdateLeaveTypeCommand, actor: ActorContext): Promise<LeaveTypeResponseDto>",
+          "steps": ["authorize (role=HR_ADMIN)", "load entity", "domain: apply updates", "save"],
+          "description": "Updates a leave type's name, advance notice, balance flag, or active status",
+          "errorConditions": [
+            "ForbiddenError — actor is not HR_ADMIN",
+            "LeaveTypeNotFoundError — leave type does not exist"
+          ]
+        }
+      ],
+      "query_service": [
+        {
+          "layer": "query_service",
+          "name": "getAll",
+          "filters": "{}",
+          "response": "LeaveTypeReadDto[]",
+          "signature": "getAll(): Promise<LeaveTypeReadDto[]>",
+          "description": "Returns all leave types including inactive",
+          "tablesJoined": ["leave_types"]
+        },
+        {
+          "layer": "query_service",
+          "name": "getActive",
+          "filters": "{}",
+          "response": "LeaveTypeReadDto[]",
+          "signature": "getActive(): Promise<LeaveTypeReadDto[]>",
+          "description": "Returns only active leave types for the submission form",
+          "tablesJoined": ["leave_types"]
+        },
+        {
+          "layer": "query_service",
+          "name": "getById",
+          "filters": "{ id: string }",
+          "response": "LeaveTypeReadDto",
+          "signature": "getById(filters: { id: string }): Promise<LeaveTypeReadDto>",
+          "description": "Returns a single leave type by ID",
+          "tablesJoined": ["leave_types"]
+        }
+      ]
+    },
+    "rules": [
+      { "id": "RULE-LT-01", "name": "CodeUniqueness",   "layer": "service", "artifact": "LeaveTypeService", "condition": "code already exists in leave_types", "action": "throw DuplicateCodeError", "elseAction": "proceed" },
+      { "id": "RULE-LT-02", "name": "AdvanceNoticeDays","layer": "domain",  "artifact": "LeaveTypeEntity",  "condition": "advance_notice_days < 0", "action": "throw InvalidAdvanceNoticeDaysError", "elseAction": "proceed" }
+    ],
+    "api": [
+      { "method": "GET",  "path": "/api/leave-types",      "requestDto": null,                 "responseDto": "LeaveTypeReadDto[]",  "description": "List all leave types" },
+      { "method": "GET",  "path": "/api/leave-types/:id",  "requestDto": null,                 "responseDto": "LeaveTypeReadDto",   "description": "Get leave type by ID" },
+      { "method": "POST", "path": "/api/leave-types",      "requestDto": "LeaveTypeRequestDto","responseDto": "LeaveTypeResponseDto","description": "Create a new leave type" },
+      { "method": "PUT",  "path": "/api/leave-types/:id",  "requestDto": "LeaveTypeRequestDto","responseDto": "LeaveTypeResponseDto","description": "Update a leave type" }
+    ],
+    "events": { "published": [] }
+  }
+}

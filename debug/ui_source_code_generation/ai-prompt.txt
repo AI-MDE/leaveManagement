@@ -1,0 +1,1793 @@
+Skill Debug Prompt
+Skill: ui_source_code_generation
+GeneratedAt: 2026-03-29T23:56:40.933Z
+
+Purpose: Generate frontend UI source code from UI module specs. Produces one component per page, a router, shared layout with menu, and an auth guard — all derived from ui-catalog.json and ui-{module}.json specs.
+
+Missing Input Patterns:
+- (none)
+
+AI Task
+You are executing the following skill. All input files are embedded below.
+Skill Name: ui_source_code_generation
+Objective: Generate frontend UI source code from UI module specs. Produces one component per page, a router, shared layout with menu, and an auth guard — all derived from ui-catalog.json and ui-{module}.json specs.
+
+Rules:
+- Read config.ui for framework and styling choices before generating any file
+- Read ui-catalog.json menu array to build the router and Sidebar — menu order = route order
+- Read each ui-{module}.json for page specs — one component per page
+- subNav in a module spec → render a TabBar or secondary nav within the module's AppShell slot
+- navigation.menuVisible=true pages are direct routes; menuVisible=false pages are nested/child routes
+- Every page component receives typed props — no any
+- Derive column and field names from shows[] and validation[] in the page spec — do not invent fields
+- Every form must implement all validation rules from the page spec
+- All list pages must render emptyState string when the data array is empty
+- All delete/destructive actions must show a confirm dialog before proceeding
+- Do not generate mock data or hardcoded values — all data comes from api/ functions
+- Do not overwrite scaffold files (package.json, tsconfig.json, vite.config.ts) if they already exist
+- Never write outside config.output.uiSrc
+
+Input Files
+
+--- FILE: ../ai-mde/architecture/architecture.json ---
+```json
+{
+  "name": "generic_enterprise_app_architecture",
+  "version": "1.2",
+  "date": "2026-03-27",
+  "purpose": "Root architectural policy manifest. Defines the layer stack, module types, tech stack, codegen conventions, and references to rule files. All generation phases read this file first.",
+  "patterns": [
+    "modular_monolith",
+    "layered",
+    "workflow_driven",
+    "event_driven_notifications"
+  ],
+  "layers": [
+    "view",
+    "controller",
+    "service",
+    "domain",
+    "data_access",
+    "adapter"
+  ],
+  "dependency_model": "view -> controller -> service -> domain -> data_access; service -> adapter; controller -> query_service -> data_access",
+  "module_types": [
+    "workflow",
+    "master_data",
+    "integration",
+    "reporting",
+    "rule_engine"
+  ],
+  "rule_files": {
+    "layer_rules":       "layer-rules.json",
+    "module_type_rules": "module-type-rules.json",
+    "interface_rules":   "interface-rules.json",
+    "data_rules":        "data-rules.json",
+    "concurrency_rules": "concurrency-rules.json",
+    "audit_rules":       "audit-rules.json"
+  },
+  "global_rules": [
+    "No module may violate declared layer dependencies.",
+    "Global design and persistence conventions are resolved from referenced rule files.",
+    "Module-level overrides are allowed only when explicitly declared and justified.",
+    "Each public method on a Service class corresponds to exactly one use case — do not aggregate unrelated operations into one service.",
+    "Reads (QueryService) bypass the domain layer and go directly to data_access. Writes (Service) must pass through the domain layer."
+  ],
+  "codegen": {
+    "naming": {
+      "module_folder": "kebab-case",
+      "file": "kebab-case",
+      "class": "PascalCase",
+      "interface": "PascalCase with I prefix",
+      "examples": {
+        "module_folder": "[module]/",
+        "service_class": "[module]Service",
+        "service_interface": "I[module]Service",
+        "query_service_class": "[module]QueryService",
+        "repository_class": "[module]Repository",
+        "repository_interface": "I[module]Repository",
+        "mapper_class": "[module]Mapper",
+        "command_class": "Approve[module]Command",
+        "request_dto": "[module]RequestDto",
+        "response_dto": "[module]ResponseDto",
+        "read_dto": "[module]ReadDto",
+        "event_type": "[module]DecidedEvent",
+        "event_publisher_interface": "DomainEventPublisher",
+        "event_publisher_impl": "OutboxEventPublisher"
+      }
+    },
+    "shared": {
+      "events": {
+        "base_type_file": "src/shared/events/domain-event.ts",
+        "publisher_interface_file": "src/shared/events/domain-event-publisher.ts",
+        "description": "DomainEvent<T> base type and DomainEventPublisher interface live in shared — not per module"
+      }
+    },
+    "structure": {
+      "module_root": "src/{module}/",
+      "layers": {
+        "dto":          "src/{module}/dto/",
+        "data_access":  "src/{module}/data_access/",
+        "domain":       "src/{module}/domain/",
+        "service":      "src/{module}/service/",
+        "query_service":"src/{module}/queries/",
+        "controller":   "src/{module}/controller/"
+      }
+    },
+    "layers": {
+      "dto": {
+        "artifacts": [
+          { "type": "class", "name": "{Module}RequestDto",   "file": "{module}.request.dto.ts",   "description": "Input shape for create and update operations" },
+          { "type": "class", "name": "{Module}ResponseDto",  "file": "{module}.response.dto.ts",  "description": "Output shape returned by write operations" },
+          { "type": "class", "name": "{Module}ReadDto",      "file": "{module}.read.dto.ts",      "description": "Read model returned by QueryService; shaped for the consuming screen or endpoint" },
+          { "type": "class", "name": "{Verb}{Module}Command","file": "{verb}-{module}.command.ts","description": "Typed input for a single write operation; one command per use case" },
+          { "type": "type",  "name": "{Module}Events",       "file": "{module}.events.ts",        "description": "Specific event payload types for this module; each is a typed alias of DomainEvent<T>" }
+        ],
+        "rules": [
+          "No business logic",
+          "No direct entity exposure outside this layer",
+          "RequestDto and ResponseDto suffix for write operations",
+          "ReadDto suffix for query results",
+          "Command suffix for write operation inputs — one Command per Service method",
+          "Event types are typed aliases of DomainEvent<T> — no extra classes; suffix with Event (e.g. [event]Event)",
+          "Base DomainEvent<T> lives in shared/events/domain-event.ts — not per module"
+        ]
+      },
+      "data_access": {
+        "artifacts": [
+          { "type": "interface", "name": "I{Module}Repository", "file": "{module}.repository.interface.ts", "description": "Repository contract consumed by the service layer; defines write and load operations" },
+          { "type": "class",     "name": "{Module}Repository",  "file": "{module}.repository.ts",           "description": "Raw SQL implementation of the repository interface" },
+          { "type": "class",     "name": "{Module}Mapper",      "file": "{module}.mapper.ts",               "description": "Translates between DB rows and domain entities; owns column-name mapping" }
+        ],
+        "rules": [
+          "Raw SQL only — no ORM",
+          "Parameterized queries always — no string concatenation",
+          "Repository maps rows to domain entities via Mapper; never exposes raw DB rows",
+          "Mapper handles all snake_case to camelCase translation and type coercions",
+          "Mapper must not contain business logic — field translation only",
+          "No business logic in Repository",
+          "Default columns on every insert: id (UUID), created_at, updated_at",
+          "Add version_no integer (default 0) when module requires optimistic locking"
+        ]
+      },
+      "domain": {
+        "artifacts": [
+          { "type": "class", "name": "{Module}Entity",      "file": "{module}.entity.ts",        "description": "Domain entity owning object state, invariants, and state transitions" },
+          { "type": "class", "name": "{Module}Validator",   "file": "{module}.validator.ts",      "description": "Pure business validation rules; throws domain errors on violation" },
+          { "type": "class", "name": "{Module}StateMachine","file": "{module}.state-machine.ts",  "description": "Lifecycle state transition guards (workflow modules only)" },
+          { "type": "class", "name": "{Module}Rules",       "file": "{module}.rules.ts",          "description": "Decision and policy evaluation logic (rule_engine modules only)" }
+        ],
+        "rules": [
+          "Pure business logic only — no DB calls, no HTTP calls",
+          "No dependency on data_access, service, controller, or adapter layers",
+          "Entity owns object identity, state, invariants, and legal state transitions",
+          "Entity exposes a rehydrate() factory for repository reconstruction and a create() factory for new instances",
+          "StateMachine artifact required for workflow module type",
+          "Rules artifact required for rule_engine module type"
+        ]
+      },
+      "service": {
+        "description": "Write-side orchestration. Each class method corresponds to exactly one use case (e.g. [module]Service.execute()). For reads, use QueryService instead.",
+        "artifacts": [
+          { "type": "interface", "name": "I{Module}Service", "file": "{module}.service.interface.ts", "description": "Public write contract exposed to controllers and other modules" },
+          { "type": "class",     "name": "{Module}Service",  "file": "{module}.service.ts",           "description": "Write use-case orchestration: authorize → load → domain behavior → save → emit event" }
+        ],
+        "rules": [
+          "One public method per use case — do not add unrelated methods to the same service class",
+          "Receives I{Module}Repository via constructor injection",
+          "Receives domain classes via constructor injection",
+          "Cross-module calls via the target module's service interface only — never its repository or domain directly",
+          "Owns transaction boundary — controllers must not manage transactions",
+          "Emits business events for workflow_state_changes, approval_decisions, policy_exceptions (see business-events.md)",
+          "Authorization checks performed here — never in controller or domain",
+          "Must not perform reads for response shaping — delegate to QueryService after write completes"
+        ]
+      },
+      "query_service": {
+        "description": "Read-side only. Bypasses the domain layer and queries data_access directly. Returns read DTOs shaped for the consuming screen or endpoint.",
+        "artifacts": [
+          { "type": "class", "name": "{Module}QueryService", "file": "{module}.query-service.ts", "description": "Stateless read orchestration; queries data_access directly and returns ReadDto" }
+        ],
+        "rules": [
+          "Stateless — no per-request mutable state",
+          "Reads only — must not write to the database",
+          "Bypasses domain layer — no entity rehydration unless domain behavior is genuinely needed for the read",
+          "Returns ReadDto shaped for the consuming screen — not the domain entity",
+          "Cross-module reads via the target module's QueryService only",
+          "Constructor may receive: db client, logger, config, cache — nothing else"
+        ]
+      },
+      "controller": {
+        "artifacts": [
+          { "type": "class", "name": "{Module}Controller", "file": "{module}.controller.ts", "description": "HTTP request handler; parses input, calls service or query_service, shapes response" }
+        ],
+        "rules": [
+          "Receives I{Module}Service via constructor injection for writes",
+          "Receives {Module}QueryService via constructor injection for reads",
+          "Uses Command for write inputs and ReadDto for read responses",
+          "Input validation at this boundary only — DTO-level, not business validation",
+          "No business logic",
+          "No transaction management",
+          "Authentication handled here or at gateway — not in service or domain"
+        ]
+      }
+    },
+    "wiring": {
+      "pattern": "constructor_injection",
+      "order": "Controller <- Service <- Repository + Domain; Controller <- QueryService <- Repository"
+    },
+    "tests": {
+      "generateTests": true,
+      "data_access": "integration test against real database",
+      "service": "unit test with repository mock and domain mock",
+      "domain": "unit test — pure functions, no mocks needed",
+      "query_service": "integration test against real database",
+      "controller": "integration test via HTTP"
+    }
+  }
+}
+```
+
+--- FILE: application/application.json ---
+```json
+{
+  "application": {
+    "name": "Leave Management System",
+    "type": "web_application",
+    "business_domain": "Human Resources / Workforce Management",
+    "description": "A system that enables employees to submit leave requests, managers to approve or reject them, and HR admins to oversee leave types, balances, and history.",
+    "actors": [
+      {
+        "id": "ACT-001",
+        "name": "Employee",
+        "description": "Submits leave requests, views own balances and history, modifies or cancels own requests"
+      },
+      {
+        "id": "ACT-002",
+        "name": "Manager",
+        "description": "Approves or rejects leave requests for direct reports, adds comments"
+      },
+      {
+        "id": "ACT-003",
+        "name": "HR Admin",
+        "description": "Manages leave types and balances, oversees all requests and history, maintains system configuration"
+      }
+    ],
+    "scope": {
+      "in_scope": [
+        "Leave request submission with type, dates, and reason",
+        "Leave balance validation before submission",
+        "Manager approval workflow with comments",
+        "Leave balance update on approval",
+        "Modify and cancel of pending requests",
+        "Stakeholder notifications",
+        "Leave history maintenance",
+        "Audit trail"
+      ],
+      "out_of_scope_assumed": [
+        "Payroll system integration (not mentioned in sources)",
+        "External calendar synchronisation (not mentioned in sources)",
+        "Leave accrual engine (not mentioned in sources)"
+      ]
+    },
+    "non_functional": {
+      "performance": "Response time under 2 seconds",
+      "compliance": "Full audit trail required"
+    },
+    "release_intent": "Initial release covering the full leave request and approval lifecycle",
+    "source_files": [
+      "ba/discovery/leave_management.md"
+    ]
+  }
+}
+```
+
+--- FILE: configuration.json ---
+```json
+{
+  "project": {
+    "name":        "My Project",
+    "type":        "application",
+    "version":     "0.1.0",
+    "methodology": "Model-Driven Engineering",
+    "description": "",
+    "author":      ""
+  },
+
+  "mde": {
+    "path":         "/dev/ai-mde",
+
+    "_note_1": "These file are using in the AI calls.",
+
+    "orchestrator": "/dev/ai-mde/ai-instructions/orchestrator.json",
+    "commands":     "/dev/ai-mde/ai-instructions/commands/",
+    "skills":       "/dev/ai-mde/ai-instructions/skills/",
+    "architecture": "/dev/ai-mde/architecture/",
+    "methodology":  "/dev/ai-mde/methodology/"
+  },
+
+  "ba": {
+    "requirements":      "/dev/leaveManagement/ba/requirements.md",
+    "analysisStatus":    "/dev/leaveManagement/ba/analysis-status.md",
+    "glossary":          "/dev/leaveManagement/ba/glossary.md",
+    "discovery":         "/dev/leaveManagement/ba/discovery",
+    "analyzed":          "/dev/leaveManagement/ba/analyzed",
+    "useCases":          "/dev/leaveManagement/ba/use-cases",
+    "useCasePattern":    "/dev/leaveManagement/ba/use-cases/uc-*.md",
+    "businessFunctions": "/dev/leaveManagement/ba/business-functions.json"
+  },
+
+  "design": {
+    "entities":        "/dev/leaveManagement/design/entities",
+    "entityPattern":   "/dev/leaveManagement/design/entities/ent-*.json",
+    "appArchitecture": "/dev/leaveManagement/design/application_architecture.json",
+    "moduleCatalog":   "/dev/leaveManagement/design/modules/module-catalog.json",
+    "modules":         "/dev/leaveManagement/design/modules",
+    "uiModules":       "/dev/leaveManagement/design/modules/ui",
+    "ldm":             "/dev/leaveManagement/ba/data-model",
+    "sql":             "/dev/leaveManagement/design/sql",
+    "schema":          "/dev/leaveManagement/design/sql/schema.json"
+  },
+
+  "project_state": {
+    "state":              "/dev/leaveManagement/project/project-state.json",
+    "questions":          "/dev/leaveManagement/project/questions.json",
+    "openQueue":          "/dev/leaveManagement/project/open-queue.json",
+    "completedQuestions": "/dev/leaveManagement/project/completed-Questions.json",
+    "commandLog":         "/dev/leaveManagement/project/logs/command-log.jsonl",
+    "methodology":        "/dev/leaveManagement/project/methodology-state.json"
+  },
+
+  "application": {
+    "definition": "/dev/leaveManagement/application/application.json"
+  },
+
+  "scripts": {
+    "setupDb":  "/dev/leaveManagement/scripts/sql/setup-db.sh",
+    "seedData": "/dev/leaveManagement/scripts/loadSeedData.js"
+  },
+
+  "ui": {
+    "framework":   "react",
+    "language":    "typescript",
+    "router":      "react-router-dom",
+    "styling":     "tailwind",
+    "stateClient": "tanstack-query",
+    "authScheme":  "jwt-bearer",
+    "apiProxy":    "http://localhost:3000"
+  },
+
+  "output": {
+    "src":      "/dev/leaveManagement/src",
+    "uiSrc":    "/dev/leaveManagement/ui/src",
+    "commands": "/dev/leaveManagement/output/commands",
+    "docs":     "/dev/leaveManagement/docs"
+  },
+
+  "test": {
+    "root":               "/dev/leaveManagement/test",
+    "unit":               "/dev/leaveManagement/test/unit",
+    "integration":        "/dev/leaveManagement/test/integration",
+    "unitPattern":        "/dev/leaveManagement/test/unit/**/*.test.ts",
+    "integrationPattern": "/dev/leaveManagement/test/integration/**/*.test.ts",
+    "framework":          "jest"
+  }
+}
+```
+
+--- FILE: design/entities/ent-employee.json ---
+```json
+{
+  "entity": {
+    "id": "ENT-001",
+    "name": "Employee",
+    "description": "A person who can submit leave requests. May also be a Manager for other employees.",
+    "actor_ref": "ACT-001",
+    "attributes": [
+      { "name": "id",          "type": "uuid",    "constraints": ["PK", "NOT NULL"] },
+      { "name": "name",        "type": "string",  "constraints": ["NOT NULL"] },
+      { "name": "email",       "type": "string",  "constraints": ["NOT NULL", "UNIQUE"] },
+      { "name": "manager_id",  "type": "uuid",    "constraints": ["FK -> Employee.id", "NULLABLE"],
+        "note": "NULL for top-level employees / HR Admins" },
+      { "name": "role",        "type": "enum",    "constraints": ["NOT NULL"],
+        "values": ["EMPLOYEE", "MANAGER", "HR_ADMIN"],
+        "note": "A Manager is also an Employee; role drives capability, not a separate table" },
+      { "name": "created_at",  "type": "datetime","constraints": ["NOT NULL"] },
+      { "name": "updated_at",  "type": "datetime","constraints": ["NOT NULL"] }
+    ],
+    "relationships": [
+      { "type": "self",       "target": "Employee",    "cardinality": "many-to-one",  "description": "Employee has one direct Manager" },
+      { "type": "has_many",   "target": "LeaveRequest","cardinality": "one-to-many",  "description": "Employee has many LeaveRequests" },
+      { "type": "has_many",   "target": "LeaveBalance","cardinality": "one-to-many",  "description": "Employee has one LeaveBalance per LeaveType" }
+    ],
+    "source_refs": ["ACT-001", "ACT-002", "ACT-003", "FR-006", "FR-009"]
+  }
+}
+```
+
+--- FILE: design/entities/ent-leave-audit-entry.json ---
+```json
+{
+  "entity": {
+    "id": "ENT-005",
+    "name": "LeaveAuditEntry",
+    "description": "Immutable audit record for every state change on a LeaveRequest. Satisfies FR-016 / NFR-002.",
+    "attributes": [
+      { "name": "id",               "type": "uuid",    "constraints": ["PK", "NOT NULL"] },
+      { "name": "leave_request_id", "type": "uuid",    "constraints": ["FK -> LeaveRequest.id", "NOT NULL"] },
+      { "name": "actor_id",         "type": "uuid",    "constraints": ["FK -> Employee.id", "NOT NULL"],
+        "note": "Who performed the action" },
+      { "name": "action",           "type": "enum",    "constraints": ["NOT NULL"],
+        "values": ["SUBMITTED", "APPROVED", "REJECTED", "CANCELLED", "MODIFIED", "BALANCE_RESTORED"],
+        "note": "Event type — append-only log" },
+      { "name": "from_status",      "type": "string",  "constraints": ["NULLABLE"] },
+      { "name": "to_status",        "type": "string",  "constraints": ["NULLABLE"] },
+      { "name": "comment",          "type": "string",  "constraints": ["NULLABLE"] },
+      { "name": "snapshot",         "type": "jsonb",   "constraints": ["NULLABLE"],
+        "note": "Optional JSON snapshot of LeaveRequest at the time of the event" },
+      { "name": "occurred_at",      "type": "datetime","constraints": ["NOT NULL"] }
+    ],
+    "notes": [
+      "Rows are never updated or deleted — append-only for audit integrity",
+      "snapshot field allows point-in-time reconstruction of request state"
+    ],
+    "relationships": [
+      { "type": "belongs_to", "target": "LeaveRequest", "cardinality": "many-to-one" },
+      { "type": "belongs_to", "target": "Employee",     "cardinality": "many-to-one", "description": "Actor who triggered the event" }
+    ],
+    "source_refs": ["FR-015", "FR-016", "NFR-002"]
+  }
+}
+```
+
+--- FILE: design/entities/ent-leave-balance.json ---
+```json
+{
+  "entity": {
+    "id": "ENT-003",
+    "name": "LeaveBalance",
+    "description": "The current leave balance for a specific Employee and LeaveType. Updated on approval and restored on cancellation.",
+    "attributes": [
+      { "name": "id",              "type": "uuid",    "constraints": ["PK", "NOT NULL"] },
+      { "name": "employee_id",     "type": "uuid",    "constraints": ["FK -> Employee.id", "NOT NULL"] },
+      { "name": "leave_type_id",   "type": "uuid",    "constraints": ["FK -> LeaveType.id", "NOT NULL"] },
+      { "name": "total_days",      "type": "decimal", "constraints": ["NOT NULL"],
+        "note": "Allocated entitlement for the period" },
+      { "name": "used_days",       "type": "decimal", "constraints": ["NOT NULL", "DEFAULT 0"] },
+      { "name": "pending_days",    "type": "decimal", "constraints": ["NOT NULL", "DEFAULT 0"],
+        "note": "Days reserved by pending/approved-but-not-yet-started requests" },
+      { "name": "period_year",     "type": "integer", "constraints": ["NOT NULL"],
+        "note": "Balances are tracked per calendar year" },
+      { "name": "updated_at",      "type": "datetime","constraints": ["NOT NULL"] }
+    ],
+    "unique_constraints": [
+      ["employee_id", "leave_type_id", "period_year"]
+    ],
+    "relationships": [
+      { "type": "belongs_to", "target": "Employee",  "cardinality": "many-to-one" },
+      { "type": "belongs_to", "target": "LeaveType", "cardinality": "many-to-one" }
+    ],
+    "source_refs": ["FR-002", "FR-003", "FR-008", "BR-001", "BR-004"]
+  }
+}
+```
+
+--- FILE: design/entities/ent-leave-request.json ---
+```json
+{
+  "entity": {
+    "id": "ENT-004",
+    "name": "LeaveRequest",
+    "description": "A request by an Employee for a period of leave. Drives the full approval lifecycle.",
+    "attributes": [
+      { "name": "id",              "type": "uuid",    "constraints": ["PK", "NOT NULL"] },
+      { "name": "employee_id",     "type": "uuid",    "constraints": ["FK -> Employee.id", "NOT NULL"] },
+      { "name": "leave_type_id",   "type": "uuid",    "constraints": ["FK -> LeaveType.id", "NOT NULL"] },
+      { "name": "start_date",      "type": "date",    "constraints": ["NOT NULL"] },
+      { "name": "end_date",        "type": "date",    "constraints": ["NOT NULL"] },
+      { "name": "total_days",      "type": "decimal", "constraints": ["NOT NULL"],
+        "note": "Calculated at submission; excludes weekends/public holidays if applicable" },
+      { "name": "reason",          "type": "string",  "constraints": ["NULLABLE"] },
+      { "name": "status",          "type": "enum",    "constraints": ["NOT NULL"],
+        "values": ["PENDING", "APPROVED", "REJECTED", "CANCELLED"],
+        "note": "State machine: PENDING → APPROVED | REJECTED; APPROVED → CANCELLED; PENDING → CANCELLED" },
+      { "name": "submitted_at",    "type": "datetime","constraints": ["NOT NULL"] },
+      { "name": "reviewed_at",     "type": "datetime","constraints": ["NULLABLE"] },
+      { "name": "reviewed_by",     "type": "uuid",    "constraints": ["FK -> Employee.id", "NULLABLE"],
+        "note": "Manager who approved/rejected" },
+      { "name": "manager_comment", "type": "string",  "constraints": ["NULLABLE"] },
+      { "name": "version",         "type": "integer", "constraints": ["NOT NULL", "DEFAULT 1"],
+        "note": "Incremented on each modification; re-approval resets status to PENDING" },
+      { "name": "created_at",      "type": "datetime","constraints": ["NOT NULL"] },
+      { "name": "updated_at",      "type": "datetime","constraints": ["NOT NULL"] }
+    ],
+    "relationships": [
+      { "type": "belongs_to", "target": "Employee",        "cardinality": "many-to-one", "description": "Requesting employee" },
+      { "type": "belongs_to", "target": "LeaveType",       "cardinality": "many-to-one" },
+      { "type": "belongs_to", "target": "Employee",        "cardinality": "many-to-one", "description": "Reviewing manager (nullable)" },
+      { "type": "has_many",   "target": "LeaveAuditEntry", "cardinality": "one-to-many", "description": "Full audit trail of all state changes" }
+    ],
+    "business_rules": [
+      "FR-002: balance must cover total_days at submission",
+      "FR-004: start_date must be at least advance_notice_days from submitted_at for the given leave type",
+      "FR-005: no overlap with other PENDING or APPROVED requests for same employee",
+      "BR-004: cancellation of APPROVED request restores balance and notifies manager",
+      "BR-005: modification of APPROVED request resets status to PENDING (re-approval required)"
+    ],
+    "source_refs": ["FR-001", "FR-002", "FR-004", "FR-005", "FR-007", "FR-008", "FR-010", "FR-011", "FR-012", "BR-003", "BR-004", "BR-005"]
+  }
+}
+```
+
+--- FILE: design/entities/ent-leave-type.json ---
+```json
+{
+  "entity": {
+    "id": "ENT-002",
+    "name": "LeaveType",
+    "description": "A category of leave with its own rules (advance notice, balance tracking). Managed by HR Admin.",
+    "attributes": [
+      { "name": "id",                  "type": "uuid",    "constraints": ["PK", "NOT NULL"] },
+      { "name": "code",                "type": "string",  "constraints": ["NOT NULL", "UNIQUE"],
+        "note": "e.g. ANNUAL, SICK, UNPAID, MATERNITY_PATERNITY" },
+      { "name": "name",                "type": "string",  "constraints": ["NOT NULL"] },
+      { "name": "advance_notice_days", "type": "integer", "constraints": ["NOT NULL"],
+        "note": "0 = no advance notice required (e.g. Sick Leave)" },
+      { "name": "requires_balance",    "type": "boolean", "constraints": ["NOT NULL"],
+        "note": "false = Unpaid leave does not deduct from a balance pool" },
+      { "name": "is_active",           "type": "boolean", "constraints": ["NOT NULL", "DEFAULT true"] },
+      { "name": "created_at",          "type": "datetime","constraints": ["NOT NULL"] },
+      { "name": "updated_at",          "type": "datetime","constraints": ["NOT NULL"] }
+    ],
+    "seed_data": [
+      { "code": "ANNUAL",              "name": "Annual Leave",              "advance_notice_days": 14, "requires_balance": true },
+      { "code": "SICK",                "name": "Sick Leave",                "advance_notice_days": 0,  "requires_balance": true },
+      { "code": "UNPAID",              "name": "Unpaid Leave",              "advance_notice_days": 30, "requires_balance": false },
+      { "code": "MATERNITY_PATERNITY", "name": "Maternity/Paternity Leave", "advance_notice_days": 30, "requires_balance": false }
+    ],
+    "relationships": [
+      { "type": "has_many", "target": "LeaveRequest", "cardinality": "one-to-many", "description": "A LeaveType appears on many LeaveRequests" },
+      { "type": "has_many", "target": "LeaveBalance",  "cardinality": "one-to-many", "description": "A LeaveType has one LeaveBalance per Employee" }
+    ],
+    "source_refs": ["LT-001", "LT-002", "LT-003", "LT-004", "BR-002", "FR-004"]
+  }
+}
+```
+
+--- FILE: design/entities/ent-notification.json ---
+```json
+{
+  "entity": {
+    "id": "ENT-006",
+    "name": "Notification",
+    "description": "An email notification record tracking what was sent, to whom, and for which event. Provides delivery traceability.",
+    "attributes": [
+      { "name": "id",               "type": "uuid",    "constraints": ["PK", "NOT NULL"] },
+      { "name": "leave_request_id", "type": "uuid",    "constraints": ["FK -> LeaveRequest.id", "NOT NULL"] },
+      { "name": "recipient_id",     "type": "uuid",    "constraints": ["FK -> Employee.id", "NOT NULL"] },
+      { "name": "event",            "type": "enum",    "constraints": ["NOT NULL"],
+        "values": ["SUBMITTED", "APPROVED", "REJECTED", "CANCELLED", "MODIFIED_PENDING", "MODIFIED_APPROVED"] },
+      { "name": "channel",          "type": "enum",    "constraints": ["NOT NULL"],
+        "values": ["EMAIL"],
+        "note": "Email only per Q-005" },
+      { "name": "sent_at",          "type": "datetime","constraints": ["NULLABLE"],
+        "note": "NULL if not yet dispatched" },
+      { "name": "status",           "type": "enum",    "constraints": ["NOT NULL"],
+        "values": ["PENDING", "SENT", "FAILED"] },
+      { "name": "created_at",       "type": "datetime","constraints": ["NOT NULL"] }
+    ],
+    "relationships": [
+      { "type": "belongs_to", "target": "LeaveRequest", "cardinality": "many-to-one" },
+      { "type": "belongs_to", "target": "Employee",     "cardinality": "many-to-one", "description": "Recipient" }
+    ],
+    "source_refs": ["FR-013", "FR-013a", "FR-013b", "FR-013c", "FR-013d", "FR-013e"]
+  }
+}
+```
+
+--- FILE: design/modules/module-catalog.json ---
+```json
+{
+  "catalog": {
+    "application": "Leave Management System",
+    "last_updated": "2026-03-27",
+    "modules": [
+      {
+        "id": "MOD-001",
+        "name": "Identity & Access",
+        "description": "Employee records, roles (Employee / Manager / HR Admin), and manager hierarchy. Drives all access control decisions.",
+        "entities": ["ENT-001"],
+        "responsibilities": [
+          "Create and manage employee records",
+          "Assign and change roles",
+          "Maintain manager-to-employee relationships"
+        ],
+        "exposes": [
+          "GET /employees",
+          "GET /employees/{id}",
+          "POST /employees",
+          "PUT /employees/{id}",
+          "GET /employees/{id}/direct-reports"
+        ],
+        "source_refs": ["ACT-001", "ACT-002", "ACT-003", "FR-006", "FR-009"]
+      },
+      {
+        "id": "MOD-002",
+        "name": "Leave Type Management",
+        "description": "HR Admin-managed catalogue of leave types with advance notice rules and balance flags.",
+        "entities": ["ENT-002"],
+        "responsibilities": [
+          "Define and maintain leave types",
+          "Store advance notice requirements per type",
+          "Flag whether a leave type deducts from a balance pool"
+        ],
+        "exposes": [
+          "GET /leave-types",
+          "GET /leave-types/{id}",
+          "POST /leave-types",
+          "PUT /leave-types/{id}",
+          "DELETE /leave-types/{id}"
+        ],
+        "source_refs": ["LT-001", "LT-002", "LT-003", "LT-004", "BR-002", "FR-004"]
+      },
+      {
+        "id": "MOD-003",
+        "name": "Leave Balance",
+        "description": "Tracks each employee's leave entitlement and usage per leave type per year. Updated atomically on approval and restored on cancellation.",
+        "entities": ["ENT-003"],
+        "responsibilities": [
+          "Initialize balances for new employees and new leave years",
+          "Validate available balance before submission",
+          "Deduct balance on approval",
+          "Restore balance on cancellation of approved leave",
+          "Provide balance summary to employees and HR Admin"
+        ],
+        "exposes": [
+          "GET /employees/{id}/balances",
+          "GET /employees/{id}/balances/{leaveTypeId}",
+          "PUT /employees/{id}/balances/{leaveTypeId}"
+        ],
+        "source_refs": ["FR-002", "FR-003", "FR-008", "BR-001", "BR-004"]
+      },
+      {
+        "id": "MOD-004",
+        "name": "Leave Request",
+        "description": "Core module. Handles the full lifecycle of a leave request: submission, validation, approval, rejection, modification, and cancellation.",
+        "entities": ["ENT-004"],
+        "responsibilities": [
+          "Accept and validate new leave requests (balance, advance notice, overlap)",
+          "Route requests to the direct manager",
+          "Process manager approve / reject decisions",
+          "Handle employee modifications of pending or approved requests",
+          "Handle employee cancellations of pending or approved requests",
+          "Trigger balance updates and notifications on state changes"
+        ],
+        "exposes": [
+          "POST /leave-requests",
+          "GET /leave-requests",
+          "GET /leave-requests/{id}",
+          "PUT /leave-requests/{id}",
+          "POST /leave-requests/{id}/approve",
+          "POST /leave-requests/{id}/reject",
+          "POST /leave-requests/{id}/cancel"
+        ],
+        "state_machine": {
+          "states": ["PENDING", "APPROVED", "REJECTED", "CANCELLED"],
+          "transitions": [
+            { "from": "PENDING",  "to": "APPROVED",   "actor": "Manager",   "trigger": "approve" },
+            { "from": "PENDING",  "to": "REJECTED",   "actor": "Manager",   "trigger": "reject" },
+            { "from": "PENDING",  "to": "PENDING",    "actor": "Employee",  "trigger": "modify (re-routes to manager)" },
+            { "from": "PENDING",  "to": "CANCELLED",  "actor": "Employee",  "trigger": "cancel" },
+            { "from": "APPROVED", "to": "PENDING",    "actor": "Employee",  "trigger": "modify (requires re-approval)" },
+            { "from": "APPROVED", "to": "CANCELLED",  "actor": "Employee",  "trigger": "cancel (restores balance)" },
+            { "from": "APPROVED", "to": "CANCELLED",  "actor": "HR Admin",  "trigger": "override cancel" },
+            { "from": "REJECTED", "to": "CANCELLED",  "actor": "HR Admin",  "trigger": "override" }
+          ]
+        },
+        "source_refs": ["FR-001", "FR-002", "FR-004", "FR-005", "FR-006", "FR-007", "FR-008", "FR-010", "FR-011", "FR-012", "BR-003", "BR-004", "BR-005"]
+      },
+      {
+        "id": "MOD-005",
+        "name": "Audit Trail",
+        "description": "Append-only log of all state changes across all leave requests. Satisfies audit and compliance requirements.",
+        "entities": ["ENT-005"],
+        "responsibilities": [
+          "Record every state transition with actor, timestamp, and optional snapshot",
+          "Expose read-only audit log per request and per employee"
+        ],
+        "exposes": [
+          "GET /leave-requests/{id}/audit",
+          "GET /employees/{id}/audit"
+        ],
+        "source_refs": ["FR-015", "FR-016", "NFR-002"]
+      },
+      {
+        "id": "MOD-006",
+        "name": "Notifications",
+        "description": "Email notification dispatch triggered by leave request events. Records delivery status for traceability.",
+        "entities": ["ENT-006"],
+        "responsibilities": [
+          "Determine recipients for each event type",
+          "Compose and dispatch email notifications",
+          "Record notification status (PENDING / SENT / FAILED)"
+        ],
+        "notification_matrix": [
+          { "event": "SUBMITTED",        "recipients": ["Manager"] },
+          { "event": "APPROVED",         "recipients": ["Employee"] },
+          { "event": "REJECTED",         "recipients": ["Employee"] },
+          { "event": "CANCELLED",        "recipients": ["Manager"] },
+          { "event": "MODIFIED_PENDING", "recipients": ["Manager"] },
+          { "event": "MODIFIED_APPROVED","recipients": ["Manager", "HR Admin"] }
+        ],
+        "source_refs": ["FR-013", "FR-013a", "FR-013b", "FR-013c", "FR-013d", "FR-013e"]
+      }
+    ]
+  }
+}
+```
+
+--- FILE: design/modules/ui/ui-catalog.json ---
+```json
+{
+  "application": "Leave Management System",
+  "generated_at": "2026-03-29",
+  "menu": [
+    {
+      "moduleId": "UI-M01",
+      "label": "My Leave",
+      "icon": "calendar",
+      "route": "/my-leave/dashboard",
+      "order": 1
+    },
+    {
+      "moduleId": "UI-M02",
+      "label": "Team Approvals",
+      "icon": "users",
+      "route": "/team-approvals/pending",
+      "order": 2
+    },
+    {
+      "moduleId": "UI-M03",
+      "label": "HR Administration",
+      "icon": "clipboard",
+      "route": "/hr-administration/leave-types",
+      "order": 3
+    }
+  ],
+  "modules": [
+    {
+      "id": "UI-M01",
+      "name": "My Leave",
+      "menuLabel": "My Leave",
+      "icon": "calendar",
+      "routePrefix": "/my-leave",
+      "purpose": "Enables an Employee to view their leave balances and history, submit new leave requests, and modify or cancel existing ones.",
+      "primaryUsers": ["Employee"],
+      "backendModules": ["MOD-004", "MOD-003", "MOD-002"],
+      "priority": "core"
+    },
+    {
+      "id": "UI-M02",
+      "name": "Team Approvals",
+      "menuLabel": "Team Approvals",
+      "icon": "users",
+      "routePrefix": "/team-approvals",
+      "purpose": "Enables a Manager to review, approve, or reject leave requests from direct reports and monitor team leave history.",
+      "primaryUsers": ["Manager"],
+      "backendModules": ["MOD-004", "MOD-003", "MOD-001"],
+      "priority": "core"
+    },
+    {
+      "id": "UI-M03",
+      "name": "HR Administration",
+      "menuLabel": "HR Administration",
+      "icon": "clipboard",
+      "routePrefix": "/hr-administration",
+      "purpose": "Enables HR Admin to manage leave types, set employee balances, oversee all requests system-wide, and review the audit trail.",
+      "primaryUsers": ["HR Admin"],
+      "backendModules": ["MOD-002", "MOD-003", "MOD-004", "MOD-005", "MOD-006", "MOD-001"],
+      "priority": "core"
+    }
+  ]
+}
+```
+
+--- FILE: design/modules/ui/ui-hr-administration.json ---
+```json
+{
+  "moduleId": "UI-M03",
+  "moduleName": "HR Administration",
+  "routePrefix": "/hr-administration",
+  "purpose": "Enables HR Admin to manage leave types, set employee balances, oversee all requests system-wide, and review the audit trail.",
+  "primaryUsers": ["HR Admin"],
+  "backendModules": ["MOD-002", "MOD-003", "MOD-004", "MOD-005", "MOD-006", "MOD-001"],
+  "pages": [
+    {
+      "id": "/hr-administration/leave-types",
+      "name": "Leave Types",
+      "routePath": "/leave-types",
+      "pattern": "list",
+      "purpose": "Shows HR Admin the full catalogue of leave types with their rules, and allows creation or navigation to edit/deactivate.",
+      "requirementRefs": ["FR-004", "LT-001", "LT-002", "LT-003", "LT-004"],
+      "businessFunctionRef": "BF-008",
+      "requiredRoles": ["HR Admin"],
+      "shows": [
+        "Leave type name",
+        "Code",
+        "Advance notice days",
+        "Requires balance flag",
+        "Active / inactive status"
+      ],
+      "actions": [
+        {
+          "label": "New Leave Type",
+          "type": "navigate",
+          "navigatesTo": "/hr-administration/leave-types/new"
+        },
+        {
+          "label": "Edit",
+          "type": "navigate",
+          "navigatesTo": "/hr-administration/leave-types/:id/edit"
+        },
+        {
+          "label": "Deactivate",
+          "type": "confirm",
+          "navigatesTo": null
+        }
+      ],
+      "filters": [
+        {
+          "field": "isActive",
+          "type": "boolean",
+          "default": true
+        }
+      ],
+      "relatedEntities": ["LeaveType"],
+      "validation": [],
+      "emptyState": "No leave types configured. Click 'New Leave Type' to add one.",
+      "drillsInto": ["/hr-administration/leave-types/new", "/hr-administration/leave-types/:id/edit"]
+    },
+    {
+      "id": "/hr-administration/leave-types/new",
+      "name": "New Leave Type",
+      "routePath": "/leave-types/new",
+      "pattern": "form",
+      "purpose": "Allows HR Admin to create a new leave type with its code, name, advance notice requirement, and balance flag.",
+      "requirementRefs": ["FR-004", "BR-002"],
+      "businessFunctionRef": "BF-008",
+      "requiredRoles": ["HR Admin"],
+      "shows": [
+        "Name field",
+        "Code field",
+        "Advance notice days field",
+        "Requires balance toggle",
+        "Active toggle (defaulted to active)"
+      ],
+      "actions": [
+        {
+          "label": "Save",
+          "type": "submit",
+          "navigatesTo": "/hr-administration/leave-types"
+        },
+        {
+          "label": "Cancel",
+          "type": "navigate",
+          "navigatesTo": "/hr-administration/leave-types"
+        }
+      ],
+      "filters": [],
+      "relatedEntities": ["LeaveType"],
+      "validation": [
+        {
+          "field": "name",
+          "rule": "required",
+          "message": "Leave type name is required."
+        },
+        {
+          "field": "code",
+          "rule": "required",
+          "message": "Leave type code is required."
+        },
+        {
+          "field": "code",
+          "rule": "unique",
+          "message": "This leave type code already exists. Please choose a unique code."
+        },
+        {
+          "field": "advanceNoticeDays",
+          "rule": "required",
+          "message": "Advance notice days is required. Enter 0 if no advance notice is needed."
+        },
+        {
+          "field": "requiresBalance",
+          "rule": "required",
+          "message": "Please indicate whether this leave type requires a balance."
+        }
+      ],
+      "emptyState": null,
+      "drillsInto": []
+    },
+    {
+      "id": "/hr-administration/leave-types/:id/edit",
+      "name": "Edit Leave Type",
+      "routePath": "/leave-types/:id/edit",
+      "pattern": "form",
+      "purpose": "Allows HR Admin to update the details or deactivate an existing leave type.",
+      "requirementRefs": ["FR-004", "BR-002"],
+      "businessFunctionRef": "BF-008",
+      "requiredRoles": ["HR Admin"],
+      "shows": [
+        "Name field (pre-filled)",
+        "Code field (pre-filled)",
+        "Advance notice days field (pre-filled)",
+        "Requires balance toggle (pre-filled)",
+        "Active toggle"
+      ],
+      "actions": [
+        {
+          "label": "Save Changes",
+          "type": "submit",
+          "navigatesTo": "/hr-administration/leave-types"
+        },
+        {
+          "label": "Cancel",
+          "type": "navigate",
+          "navigatesTo": "/hr-administration/leave-types"
+        }
+      ],
+      "filters": [],
+      "relatedEntities": ["LeaveType"],
+      "validation": [
+        {
+          "field": "name",
+          "rule": "required",
+          "message": "Leave type name is required."
+        },
+        {
+          "field": "code",
+          "rule": "required",
+          "message": "Leave type code is required."
+        },
+        {
+          "field": "code",
+          "rule": "unique",
+          "message": "This leave type code already exists. Please choose a unique code."
+        },
+        {
+          "field": "advanceNoticeDays",
+          "rule": "required",
+          "message": "Advance notice days is required. Enter 0 if no advance notice is needed."
+        },
+        {
+          "field": "requiresBalance",
+          "rule": "required",
+          "message": "Please indicate whether this leave type requires a balance."
+        }
+      ],
+      "emptyState": null,
+      "drillsInto": []
+    },
+    {
+      "id": "/hr-administration/balances",
+      "name": "Employee Balances",
+      "routePath": "/balances",
+      "pattern": "list",
+      "purpose": "Shows HR Admin the current leave balance entitlements across all employees and leave types, with the ability to drill into a single employee or set/adjust balances.",
+      "requirementRefs": ["FR-002", "FR-003", "BR-001"],
+      "businessFunctionRef": "BF-007",
+      "requiredRoles": ["HR Admin"],
+      "shows": [
+        "Employee name",
+        "Leave type",
+        "Year",
+        "Total entitlement days",
+        "Used days",
+        "Pending days",
+        "Available days"
+      ],
+      "actions": [
+        {
+          "label": "Set / Adjust Balance",
+          "type": "navigate",
+          "navigatesTo": "/hr-administration/balances/edit"
+        },
+        {
+          "label": "View Employee Detail",
+          "type": "navigate",
+          "navigatesTo": "/hr-administration/balances/:employeeId"
+        }
+      ],
+      "filters": [
+        {
+          "field": "employee",
+          "type": "text",
+          "default": null
+        },
+        {
+          "field": "leaveType",
+          "type": "select",
+          "default": null
+        },
+        {
+          "field": "year",
+          "type": "select",
+          "default": null
+        }
+      ],
+      "relatedEntities": ["LeaveBalance", "Employee", "LeaveType"],
+      "validation": [],
+      "emptyState": "No balances found. Use 'Set / Adjust Balance' to configure entitlements for employees.",
+      "drillsInto": ["/hr-administration/balances/edit", "/hr-administration/balances/:employeeId"]
+    },
+    {
+      "id": "/hr-administration/balances/edit",
+      "name": "Set Employee Balance",
+      "routePath": "/balances/edit",
+      "pattern": "form",
+      "purpose": "Allows HR Admin to create or update the leave balance entitlement for a specific employee, leave type, and year.",
+      "requirementRefs": ["FR-002", "BR-001"],
+      "businessFunctionRef": "BF-007",
+      "requiredRoles": ["HR Admin"],
+      "shows": [
+        "Employee selector",
+        "Leave type selector",
+        "Year field",
+        "Total days entitlement field",
+        "Read-only: existing used days (if record exists)",
+        "Read-only: existing pending days (if record exists)"
+      ],
+      "actions": [
+        {
+          "label": "Save Balance",
+          "type": "submit",
+          "navigatesTo": "/hr-administration/balances"
+        },
+        {
+          "label": "Cancel",
+          "type": "navigate",
+          "navigatesTo": "/hr-administration/balances"
+        }
+      ],
+      "filters": [],
+      "relatedEntities": ["LeaveBalance", "Employee", "LeaveType"],
+      "validation": [
+        {
+          "field": "employee",
+          "rule": "required",
+          "message": "Please select an employee."
+        },
+        {
+          "field": "leaveType",
+          "rule": "required",
+          "message": "Please select a leave type."
+        },
+        {
+          "field": "year",
+          "rule": "required",
+          "message": "Please specify the leave year."
+        },
+        {
+          "field": "totalDays",
+          "rule": "required",
+          "message": "Total entitlement days is required."
+        },
+        {
+          "field": "totalDays",
+          "rule": "pattern",
+          "message": "Total entitlement days must be a non-negative number."
+        }
+      ],
+      "emptyState": null,
+      "drillsInto": []
+    },
+    {
+      "id": "/hr-administration/balances/:employeeId",
+      "name": "Employee Balance Detail",
+      "routePath": "/balances/:employeeId",
+      "pattern": "detail",
+      "purpose": "Shows HR Admin the complete balance breakdown for a single employee across all leave types and years.",
+      "requirementRefs": ["FR-002", "FR-003", "BR-001"],
+      "businessFunctionRef": "BF-007",
+      "requiredRoles": ["HR Admin"],
+      "shows": [
+        "Employee name and email",
+        "Balance table: leave type, year, total, used, pending, available",
+        "History of balance adjustments"
+      ],
+      "actions": [
+        {
+          "label": "Set / Adjust Balance",
+          "type": "navigate",
+          "navigatesTo": "/hr-administration/balances/edit"
+        },
+        {
+          "label": "Back to Balances",
+          "type": "navigate",
+          "navigatesTo": "/hr-administration/balances"
+        }
+      ],
+      "filters": [],
+      "relatedEntities": ["LeaveBalance", "Employee", "LeaveType"],
+      "validation": [],
+      "emptyState": "No balances configured for this employee.",
+      "drillsInto": ["/hr-administration/balances/edit"]
+    },
+    {
+      "id": "/hr-administration/requests",
+      "name": "All Leave Requests",
+      "routePath": "/requests",
+      "pattern": "list",
+      "purpose": "Shows HR Admin all leave requests system-wide, filterable by employee, status, type, and date range, with drill-through to details and override actions.",
+      "requirementRefs": ["FR-015", "FR-009"],
+      "businessFunctionRef": "BF-010",
+      "requiredRoles": ["HR Admin"],
+      "shows": [
+        "Employee name",
+        "Leave type",
+        "Start date",
+        "End date",
+        "Total days",
+        "Status badge",
+        "Submitted date",
+        "Manager who reviewed"
+      ],
+      "actions": [
+        {
+          "label": "View Detail",
+          "type": "navigate",
+          "navigatesTo": "/hr-administration/requests/:id"
+        },
+        {
+          "label": "Export",
+          "type": "export",
+          "navigatesTo": null
+        }
+      ],
+      "filters": [
+        {
+          "field": "employee",
+          "type": "text",
+          "default": null
+        },
+        {
+          "field": "status",
+          "type": "select",
+          "default": null
+        },
+        {
+          "field": "leaveType",
+          "type": "select",
+          "default": null
+        },
+        {
+          "field": "dateRange",
+          "type": "date-range",
+          "default": null
+        }
+      ],
+      "relatedEntities": ["LeaveRequest", "Employee", "LeaveType"],
+      "validation": [],
+      "emptyState": "No leave requests found matching the selected filters.",
+      "drillsInto": ["/hr-administration/requests/:id"]
+    },
+    {
+      "id": "/hr-administration/requests/:id",
+      "name": "Request Detail (HR View)",
+      "routePath": "/requests/:id",
+      "pattern": "detail",
+      "purpose": "Shows HR Admin all details and the full audit trail of a single leave request, with override cancel action available.",
+      "requirementRefs": ["FR-009", "FR-015", "FR-016", "FR-012"],
+      "businessFunctionRef": "BF-011",
+      "requiredRoles": ["HR Admin"],
+      "shows": [
+        "Employee name and manager",
+        "Leave type",
+        "Start date and end date",
+        "Total days",
+        "Status",
+        "Optional reason",
+        "Manager comment",
+        "Request version",
+        "Audit trail timeline (actor, action, from status, to status, timestamp, optional comment)"
+      ],
+      "actions": [
+        {
+          "label": "Override Cancel",
+          "type": "confirm",
+          "navigatesTo": "/hr-administration/requests"
+        },
+        {
+          "label": "Back to All Requests",
+          "type": "navigate",
+          "navigatesTo": "/hr-administration/requests"
+        }
+      ],
+      "filters": [],
+      "relatedEntities": ["LeaveRequest", "LeaveAuditEntry", "Employee", "LeaveType"],
+      "validation": [],
+      "emptyState": null,
+      "drillsInto": []
+    },
+    {
+      "id": "/hr-administration/audit",
+      "name": "Audit Trail",
+      "routePath": "/audit",
+      "pattern": "list",
+      "purpose": "Provides HR Admin with a searchable, read-only view of the complete system-wide audit log across all leave requests.",
+      "requirementRefs": ["FR-016", "NFR-002"],
+      "businessFunctionRef": "BF-011",
+      "requiredRoles": ["HR Admin"],
+      "shows": [
+        "Occurred at timestamp",
+        "Leave request ID",
+        "Employee name",
+        "Action (SUBMITTED / APPROVED / REJECTED / CANCELLED / MODIFIED / BALANCE_RESTORED)",
+        "From status",
+        "To status",
+        "Actor name",
+        "Optional comment"
+      ],
+      "actions": [
+        {
+          "label": "View Request",
+          "type": "navigate",
+          "navigatesTo": "/hr-administration/requests/:id"
+        }
+      ],
+      "filters": [
+        {
+          "field": "employee",
+          "type": "text",
+          "default": null
+        },
+        {
+          "field": "action",
+          "type": "select",
+          "default": null
+        },
+        {
+          "field": "dateRange",
+          "type": "date-range",
+          "default": null
+        }
+      ],
+      "relatedEntities": ["LeaveAuditEntry", "LeaveRequest", "Employee"],
+      "validation": [],
+      "emptyState": "No audit entries found matching the selected filters.",
+      "drillsInto": ["/hr-administration/requests/:id"]
+    }
+  ],
+  "subNav": [
+    {
+      "label": "Leave Types",
+      "route": "/hr-administration/leave-types"
+    },
+    {
+      "label": "Balances",
+      "route": "/hr-administration/balances"
+    },
+    {
+      "label": "Requests",
+      "route": "/hr-administration/requests"
+    },
+    {
+      "label": "Audit Trail",
+      "route": "/hr-administration/audit"
+    }
+  ],
+  "navigation": {
+    "entryPoint": "/hr-administration/leave-types",
+    "menuVisible": true,
+    "flows": [
+      { "from": "/hr-administration/leave-types", "to": "/hr-administration/leave-types/new", "via": "New Leave Type" },
+      { "from": "/hr-administration/leave-types", "to": "/hr-administration/leave-types/:id/edit", "via": "Edit" },
+      { "from": "/hr-administration/leave-types/new", "to": "/hr-administration/leave-types", "via": "Save" },
+      { "from": "/hr-administration/leave-types/new", "to": "/hr-administration/leave-types", "via": "Cancel" },
+      { "from": "/hr-administration/leave-types/:id/edit", "to": "/hr-administration/leave-types", "via": "Save Changes" },
+      { "from": "/hr-administration/leave-types/:id/edit", "to": "/hr-administration/leave-types", "via": "Cancel" },
+      { "from": "/hr-administration/balances", "to": "/hr-administration/balances/edit", "via": "Set / Adjust Balance" },
+      { "from": "/hr-administration/balances", "to": "/hr-administration/balances/:employeeId", "via": "View Employee Detail" },
+      { "from": "/hr-administration/balances/edit", "to": "/hr-administration/balances", "via": "Save Balance" },
+      { "from": "/hr-administration/balances/edit", "to": "/hr-administration/balances", "via": "Cancel" },
+      { "from": "/hr-administration/balances/:employeeId", "to": "/hr-administration/balances/edit", "via": "Set / Adjust Balance" },
+      { "from": "/hr-administration/balances/:employeeId", "to": "/hr-administration/balances", "via": "Back to Balances" },
+      { "from": "/hr-administration/requests", "to": "/hr-administration/requests/:id", "via": "View Detail" },
+      { "from": "/hr-administration/requests/:id", "to": "/hr-administration/requests", "via": "Override Cancel" },
+      { "from": "/hr-administration/requests/:id", "to": "/hr-administration/requests", "via": "Back to All Requests" },
+      { "from": "/hr-administration/audit", "to": "/hr-administration/requests/:id", "via": "View Request" }
+    ]
+  }
+}
+```
+
+--- FILE: design/modules/ui/ui-my-leave.json ---
+```json
+{
+  "moduleId": "UI-M01",
+  "moduleName": "My Leave",
+  "routePrefix": "/my-leave",
+  "purpose": "Enables an Employee to view their leave balances and history, submit new leave requests, and modify or cancel existing ones.",
+  "primaryUsers": ["Employee"],
+  "backendModules": ["MOD-004", "MOD-003", "MOD-002"],
+  "pages": [
+    {
+      "id": "/my-leave/dashboard",
+      "name": "My Leave Dashboard",
+      "routePath": "/dashboard",
+      "pattern": "dashboard",
+      "purpose": "Gives the Employee an at-a-glance summary of their current leave balances, any active requests, and quick access to submit a new request or browse all requests.",
+      "requirementRefs": ["FR-001", "FR-002", "FR-015"],
+      "businessFunctionRef": "BF-001",
+      "requiredRoles": ["Employee"],
+      "shows": [
+        "Balance summary cards per leave type (total, used, pending, available days)",
+        "List of active requests (PENDING / APPROVED) with status badges",
+        "Quick-action button to submit a new leave request"
+      ],
+      "actions": [
+        {
+          "label": "New Request",
+          "type": "navigate",
+          "navigatesTo": "/my-leave/new"
+        },
+        {
+          "label": "View All Requests",
+          "type": "navigate",
+          "navigatesTo": "/my-leave/requests"
+        }
+      ],
+      "filters": [],
+      "relatedEntities": ["LeaveBalance", "LeaveRequest", "LeaveType"],
+      "validation": [],
+      "emptyState": "You have no active leave requests. Click 'New Request' to submit one.",
+      "drillsInto": ["/my-leave/new", "/my-leave/requests"]
+    },
+    {
+      "id": "/my-leave/new",
+      "name": "Submit Leave Request",
+      "routePath": "/new",
+      "pattern": "form",
+      "purpose": "Allows the Employee to select a leave type, specify dates and an optional reason, and submit a new leave request for manager approval.",
+      "requirementRefs": ["FR-001", "FR-002", "FR-003", "FR-004", "FR-005"],
+      "businessFunctionRef": "BF-001",
+      "requiredRoles": ["Employee"],
+      "shows": [
+        "Leave type selector (active types only)",
+        "Start date picker",
+        "End date picker",
+        "Calculated total days (read-only, auto-computed)",
+        "Available balance for selected leave type (read-only)",
+        "Reason text field (optional)",
+        "Advance notice requirement hint for selected leave type",
+        "Inline validation messages for balance, advance notice, and overlap"
+      ],
+      "actions": [
+        {
+          "label": "Submit Request",
+          "type": "submit",
+          "navigatesTo": "/my-leave/dashboard"
+        },
+        {
+          "label": "Cancel",
+          "type": "navigate",
+          "navigatesTo": "/my-leave/dashboard"
+        }
+      ],
+      "filters": [],
+      "relatedEntities": ["LeaveRequest", "LeaveType", "LeaveBalance"],
+      "validation": [
+        {
+          "field": "leaveType",
+          "rule": "required",
+          "message": "Please select a leave type."
+        },
+        {
+          "field": "startDate",
+          "rule": "required",
+          "message": "Please select a start date."
+        },
+        {
+          "field": "endDate",
+          "rule": "required",
+          "message": "Please select an end date."
+        },
+        {
+          "field": "endDate",
+          "rule": "pattern",
+          "message": "End date must be on or after the start date."
+        },
+        {
+          "field": "startDate",
+          "rule": "pattern",
+          "message": "Start date does not meet the advance notice requirement for the selected leave type."
+        },
+        {
+          "field": "startDate",
+          "rule": "pattern",
+          "message": "The requested dates overlap with an existing pending or approved request."
+        },
+        {
+          "field": "leaveType",
+          "rule": "pattern",
+          "message": "Insufficient balance for the selected leave type. Available: {availableDays} days."
+        }
+      ],
+      "emptyState": null,
+      "drillsInto": []
+    },
+    {
+      "id": "/my-leave/requests",
+      "name": "My Requests",
+      "routePath": "/requests",
+      "pattern": "list",
+      "purpose": "Shows the Employee the full list of their leave requests with filtering and drill-through to request details.",
+      "requirementRefs": ["FR-015", "FR-010", "FR-011", "FR-012"],
+      "businessFunctionRef": "BF-010",
+      "requiredRoles": ["Employee"],
+      "shows": [
+        "Leave type",
+        "Start date",
+        "End date",
+        "Total days",
+        "Status badge (PENDING / APPROVED / REJECTED / CANCELLED)",
+        "Submitted date"
+      ],
+      "actions": [
+        {
+          "label": "New Request",
+          "type": "navigate",
+          "navigatesTo": "/my-leave/new"
+        },
+        {
+          "label": "View",
+          "type": "navigate",
+          "navigatesTo": "/my-leave/requests/:id"
+        }
+      ],
+      "filters": [
+        {
+          "field": "status",
+          "type": "select",
+          "default": null
+        },
+        {
+          "field": "leaveType",
+          "type": "select",
+          "default": null
+        },
+        {
+          "field": "dateRange",
+          "type": "date-range",
+          "default": null
+        }
+      ],
+      "relatedEntities": ["LeaveRequest", "LeaveType"],
+      "validation": [],
+      "emptyState": "You have no leave requests. Click 'New Request' to submit one.",
+      "drillsInto": ["/my-leave/requests/:id"]
+    },
+    {
+      "id": "/my-leave/requests/:id",
+      "name": "Request Detail",
+      "routePath": "/requests/:id",
+      "pattern": "detail",
+      "purpose": "Displays all details of a single leave request and allows the Employee to modify or cancel it if eligible.",
+      "requirementRefs": ["FR-010", "FR-011", "FR-012", "FR-015"],
+      "businessFunctionRef": "BF-002",
+      "requiredRoles": ["Employee"],
+      "shows": [
+        "Leave type",
+        "Start date and end date",
+        "Total days",
+        "Status and status history",
+        "Optional reason",
+        "Manager comment (if reviewed)",
+        "Submitted date",
+        "Last updated date"
+      ],
+      "actions": [
+        {
+          "label": "Modify Request",
+          "type": "navigate",
+          "navigatesTo": "/my-leave/requests/:id/edit"
+        },
+        {
+          "label": "Cancel Request",
+          "type": "confirm",
+          "navigatesTo": "/my-leave/requests"
+        },
+        {
+          "label": "Back to My Requests",
+          "type": "navigate",
+          "navigatesTo": "/my-leave/requests"
+        }
+      ],
+      "filters": [],
+      "relatedEntities": ["LeaveRequest", "LeaveType"],
+      "validation": [],
+      "emptyState": null,
+      "drillsInto": ["/my-leave/requests/:id/edit"]
+    },
+    {
+      "id": "/my-leave/requests/:id/edit",
+      "name": "Modify Leave Request",
+      "routePath": "/requests/:id/edit",
+      "pattern": "form",
+      "purpose": "Allows the Employee to update the dates or reason of a PENDING or APPROVED leave request, with re-validation applied.",
+      "requirementRefs": ["FR-010", "BR-005", "FR-013d", "FR-013e"],
+      "businessFunctionRef": "BF-002",
+      "requiredRoles": ["Employee"],
+      "shows": [
+        "Leave type (read-only)",
+        "Start date picker (pre-filled)",
+        "End date picker (pre-filled)",
+        "Calculated total days (read-only, auto-computed)",
+        "Available balance for leave type (read-only)",
+        "Reason text field (optional, pre-filled)",
+        "Warning banner if modifying an approved request (will require re-approval)"
+      ],
+      "actions": [
+        {
+          "label": "Save Changes",
+          "type": "submit",
+          "navigatesTo": "/my-leave/requests/:id"
+        },
+        {
+          "label": "Cancel",
+          "type": "navigate",
+          "navigatesTo": "/my-leave/requests/:id"
+        }
+      ],
+      "filters": [],
+      "relatedEntities": ["LeaveRequest", "LeaveType", "LeaveBalance"],
+      "validation": [
+        {
+          "field": "startDate",
+          "rule": "required",
+          "message": "Please select a start date."
+        },
+        {
+          "field": "endDate",
+          "rule": "required",
+          "message": "Please select an end date."
+        },
+        {
+          "field": "endDate",
+          "rule": "pattern",
+          "message": "End date must be on or after the start date."
+        },
+        {
+          "field": "startDate",
+          "rule": "pattern",
+          "message": "Updated start date does not meet the advance notice requirement for the selected leave type."
+        },
+        {
+          "field": "startDate",
+          "rule": "pattern",
+          "message": "Updated dates overlap with another pending or approved request."
+        },
+        {
+          "field": "startDate",
+          "rule": "pattern",
+          "message": "Insufficient balance for the updated date range."
+        }
+      ],
+      "emptyState": null,
+      "drillsInto": []
+    }
+  ],
+  "navigation": {
+    "entryPoint": "/my-leave/dashboard",
+    "menuVisible": true,
+    "flows": [
+      { "from": "/my-leave/dashboard", "to": "/my-leave/new", "via": "New Request" },
+      { "from": "/my-leave/dashboard", "to": "/my-leave/requests", "via": "View All Requests" },
+      { "from": "/my-leave/new", "to": "/my-leave/dashboard", "via": "Submit Request" },
+      { "from": "/my-leave/new", "to": "/my-leave/dashboard", "via": "Cancel" },
+      { "from": "/my-leave/requests", "to": "/my-leave/new", "via": "New Request" },
+      { "from": "/my-leave/requests", "to": "/my-leave/requests/:id", "via": "View" },
+      { "from": "/my-leave/requests/:id", "to": "/my-leave/requests/:id/edit", "via": "Modify Request" },
+      { "from": "/my-leave/requests/:id", "to": "/my-leave/requests", "via": "Cancel Request" },
+      { "from": "/my-leave/requests/:id", "to": "/my-leave/requests", "via": "Back to My Requests" },
+      { "from": "/my-leave/requests/:id/edit", "to": "/my-leave/requests/:id", "via": "Save Changes" },
+      { "from": "/my-leave/requests/:id/edit", "to": "/my-leave/requests/:id", "via": "Cancel" }
+    ]
+  }
+}
+```
+
+--- FILE: design/modules/ui/ui-team-approvals.json ---
+```json
+{
+  "moduleId": "UI-M02",
+  "moduleName": "Team Approvals",
+  "routePrefix": "/team-approvals",
+  "purpose": "Enables a Manager to review, approve, or reject leave requests from direct reports and monitor team leave history.",
+  "primaryUsers": ["Manager"],
+  "backendModules": ["MOD-004", "MOD-003", "MOD-001"],
+  "pages": [
+    {
+      "id": "/team-approvals/pending",
+      "name": "Pending Requests",
+      "routePath": "/pending",
+      "pattern": "list",
+      "purpose": "Shows the Manager the full list of PENDING leave requests from their direct reports, filterable and drill-through to individual decisions.",
+      "requirementRefs": ["FR-006", "FR-007", "FR-009"],
+      "businessFunctionRef": "BF-004",
+      "requiredRoles": ["Manager"],
+      "shows": [
+        "Employee name",
+        "Leave type",
+        "Start date",
+        "End date",
+        "Total days",
+        "Submitted date",
+        "Request version"
+      ],
+      "actions": [
+        {
+          "label": "Review",
+          "type": "navigate",
+          "navigatesTo": "/team-approvals/pending/:id"
+        }
+      ],
+      "filters": [
+        {
+          "field": "leaveType",
+          "type": "select",
+          "default": null
+        },
+        {
+          "field": "dateRange",
+          "type": "date-range",
+          "default": null
+        }
+      ],
+      "relatedEntities": ["LeaveRequest", "Employee", "LeaveType"],
+      "validation": [],
+      "emptyState": "No pending requests. All leave requests from your team have been reviewed.",
+      "drillsInto": ["/team-approvals/pending/:id"]
+    },
+    {
+      "id": "/team-approvals/pending/:id",
+      "name": "Review Request",
+      "routePath": "/pending/:id",
+      "pattern": "detail",
+      "purpose": "Displays all details of a single pending leave request and allows the Manager to approve or reject it with an optional comment.",
+      "requirementRefs": ["FR-007", "FR-008", "FR-009", "FR-013b"],
+      "businessFunctionRef": "BF-004",
+      "requiredRoles": ["Manager"],
+      "shows": [
+        "Employee name and email",
+        "Leave type",
+        "Start date and end date",
+        "Total days requested",
+        "Employee's available balance for the leave type",
+        "Optional reason provided by employee",
+        "Request version (highlighted if re-submitted after modification)",
+        "Submission date"
+      ],
+      "actions": [
+        {
+          "label": "Approve",
+          "type": "submit",
+          "navigatesTo": "/team-approvals/pending"
+        },
+        {
+          "label": "Reject",
+          "type": "modal",
+          "navigatesTo": "/team-approvals/pending"
+        },
+        {
+          "label": "Back to Pending",
+          "type": "navigate",
+          "navigatesTo": "/team-approvals/pending"
+        }
+      ],
+      "filters": [],
+      "relatedEntities": ["LeaveRequest", "Employee", "LeaveType", "LeaveBalance"],
+      "validation": [],
+      "emptyState": null,
+      "drillsInto": []
+    },
+    {
+      "id": "/team-approvals/history",
+      "name": "Team Leave History",
+      "routePath": "/history",
+      "pattern": "list",
+      "purpose": "Shows the Manager a filterable history of all leave requests from their direct reports across all statuses.",
+      "requirementRefs": ["FR-015"],
+      "businessFunctionRef": "BF-010",
+      "requiredRoles": ["Manager"],
+      "shows": [
+        "Employee name",
+        "Leave type",
+        "Start date",
+        "End date",
+        "Total days",
+        "Status badge",
+        "Submitted date"
+      ],
+      "actions": [
+        {
+          "label": "View Detail",
+          "type": "navigate",
+          "navigatesTo": "/team-approvals/history/:id"
+        }
+      ],
+      "filters": [
+        {
+          "field": "employee",
+          "type": "select",
+          "default": null
+        },
+        {
+          "field": "status",
+          "type": "select",
+          "default": null
+        },
+        {
+          "field": "leaveType",
+          "type": "select",
+          "default": null
+        },
+        {
+          "field": "dateRange",
+          "type": "date-range",
+          "default": null
+        }
+      ],
+      "relatedEntities": ["LeaveRequest", "Employee", "LeaveType"],
+      "validation": [],
+      "emptyState": "No leave history found for your team with the selected filters.",
+      "drillsInto": ["/team-approvals/history/:id"]
+    },
+    {
+      "id": "/team-approvals/history/:id",
+      "name": "Request History Detail",
+      "routePath": "/history/:id",
+      "pattern": "detail",
+      "purpose": "Shows the Manager the complete detail and audit trail of a historical leave request from their direct report.",
+      "requirementRefs": ["FR-015", "FR-016"],
+      "businessFunctionRef": "BF-011",
+      "requiredRoles": ["Manager"],
+      "shows": [
+        "Employee name",
+        "Leave type",
+        "Start date and end date",
+        "Total days",
+        "Status",
+        "Optional reason",
+        "Manager comment",
+        "Audit trail timeline (actor, action, from status, to status, timestamp)"
+      ],
+      "actions": [
+        {
+          "label": "Back to Team History",
+          "type": "navigate",
+          "navigatesTo": "/team-approvals/history"
+        }
+      ],
+      "filters": [],
+      "relatedEntities": ["LeaveRequest", "LeaveAuditEntry", "Employee", "LeaveType"],
+      "validation": [],
+      "emptyState": null,
+      "drillsInto": []
+    }
+  ],
+  "navigation": {
+    "entryPoint": "/team-approvals/pending",
+    "menuVisible": true,
+    "flows": [
+      { "from": "/team-approvals/pending", "to": "/team-approvals/pending/:id", "via": "Review" },
+      { "from": "/team-approvals/pending/:id", "to": "/team-approvals/pending", "via": "Approve" },
+      { "from": "/team-approvals/pending/:id", "to": "/team-approvals/pending", "via": "Reject" },
+      { "from": "/team-approvals/pending/:id", "to": "/team-approvals/pending", "via": "Back to Pending" },
+      { "from": "/team-approvals/history", "to": "/team-approvals/history/:id", "via": "View Detail" },
+      { "from": "/team-approvals/history/:id", "to": "/team-approvals/history", "via": "Back to Team History" }
+    ]
+  }
+}
+```
+
+Produce outputs exactly at the expected paths.

@@ -1,0 +1,358 @@
+Skill Debug Prompt
+Skill: governance_validation
+GeneratedAt: 2026-03-29T23:54:12.307Z
+
+Purpose: Validate traceability, phase completeness, TOGAF/Zachman coverage, and missing artifacts
+
+Missing Input Patterns:
+- design/modules/module-tests.json
+- /dev/ai-mde/methodology/
+
+AI Task
+You are executing the following skill. All input files are embedded below.
+Skill Name: governance_validation
+Objective: Validate traceability, phase completeness, TOGAF/Zachman coverage, and missing artifacts
+
+Rules:
+- Every requirement should map to functions, modules, and tests where relevant
+- Missing artifacts must be reported, not guessed
+
+Input Files
+
+--- FILE: ba/requirements.md ---
+```md
+# Requirements Baseline — Leave Management System
+
+> **Status:** Baselined — all clarification questions resolved
+> **Source:** ba/discovery/leave_management.md
+> **Last updated:** 2026-03-27
+
+---
+
+## 1. Business Context
+
+The Leave Management System enables employees to submit time-off requests, managers to approve or reject them, and HR Admins to oversee leave types, balances, and history. The system must maintain a full audit trail and respond within 2 seconds.
+
+---
+
+## 2. Actors
+
+| ID      | Actor     | Role |
+|---------|-----------|------|
+| ACT-001 | Employee  | Submits, modifies, and cancels own leave requests; views own balance and history |
+| ACT-002 | Manager   | Reviews and approves or rejects leave requests for direct reports |
+| ACT-003 | HR Admin  | Manages leave types, balances, and system-wide configuration; oversees all requests |
+
+---
+
+## 3. Functional Requirements
+
+### 3.1 Leave Request Submission
+
+| ID     | Requirement | Status |
+|--------|-------------|--------|
+| FR-001 | An Employee shall be able to submit a leave request specifying leave type, start date, end date, and an optional reason. | Explicit |
+| FR-002 | The system shall validate the Employee's available leave balance before submission. | Explicit |
+| FR-003 | If balance is insufficient, the system shall block submission unless an override is permitted. | Explicit |
+| FR-004 | The system shall enforce a minimum advance notice period per leave type: Annual Leave requires 14 days notice; Unpaid Leave requires 30 days notice; Maternity/Paternity Leave requires 30 days notice; Sick Leave has no advance notice requirement. | Resolved — Q-001 |
+| FR-005 | The system shall prevent overlapping leave requests for the same employee. Team capacity is visible to managers but the system does not enforce team-level overlap. | Resolved — Q-002 |
+
+### 3.2 Approval Workflow
+
+| ID     | Requirement | Status |
+|--------|-------------|--------|
+| FR-006 | A submitted leave request shall be routed to the Employee's direct Manager for approval. | Explicit |
+| FR-007 | A Manager shall be able to approve or reject a leave request with an optional comment. | Explicit |
+| FR-008 | On approval, the system shall deduct the approved days from the Employee's leave balance. | Explicit |
+| FR-009 | The approval chain is single-level: Employee submits to direct Manager. HR Admin can override or intervene but is not part of the standard approval chain. | Resolved — Q-003 |
+
+### 3.3 Modify and Cancel
+
+| ID     | Requirement | Status |
+|--------|-------------|--------|
+| FR-010 | An Employee shall be able to modify a pending (not yet approved) leave request. Modification of an approved request requires re-approval. | Resolved — Q-004 |
+| FR-011 | An Employee shall be able to cancel a pending leave request. | Explicit |
+| FR-012 | An Employee shall be able to cancel an approved leave request. On cancellation, the system shall restore the balance and notify the Manager. | Resolved — Q-004 |
+
+### 3.4 Notifications
+
+| ID     | Requirement | Status |
+|--------|-------------|--------|
+| FR-013 | The system shall send email notifications on the following events: | Resolved — Q-005 |
+| FR-013a | On submission: notify Manager. | Resolved |
+| FR-013b | On approval or rejection: notify Employee. | Resolved |
+| FR-013c | On cancellation of any request: notify Manager. | Resolved |
+| FR-013d | On modification of a pending request: notify Manager. | Resolved |
+| FR-013e | On modification of an approved request: notify Manager and HR Admin. | Resolved |
+
+### 3.5 Leave History and Audit
+
+| ID     | Requirement | Status |
+|--------|-------------|--------|
+| FR-015 | The system shall maintain a full history of all leave requests per employee. | Explicit |
+| FR-016 | The system shall maintain a full audit trail of all state changes. | Explicit |
+
+---
+
+## 4. Business Rules
+
+| ID     | Rule | Status |
+|--------|------|--------|
+| BR-001 | An employee cannot submit a leave request that exceeds their available balance, unless explicitly overridden by HR Admin. | Baselined |
+| BR-002 | Advance notice rules by leave type: Annual Leave — 14 days; Unpaid Leave — 30 days; Maternity/Paternity Leave — 30 days; Sick Leave — none. | Resolved — Q-001 |
+| BR-003 | No employee may have two overlapping approved or pending leave requests. Overlap checking is per-employee only; team capacity is informational, not enforced. | Resolved — Q-002 |
+| BR-004 | Cancellation of an approved leave request restores the deducted balance and triggers a notification to the Manager. | Resolved — Q-004 |
+| BR-005 | Modification of an approved leave request requires re-approval and notifies Manager and HR Admin. | Resolved — Q-004 |
+
+---
+
+## 5. Leave Types
+
+| ID   | Name                    | Advance Notice | Notes |
+|------|-------------------------|----------------|-------|
+| LT-001 | Annual Leave          | 14 days        |       |
+| LT-002 | Sick Leave            | None           |       |
+| LT-003 | Unpaid Leave          | 30 days        |       |
+| LT-004 | Maternity/Paternity Leave | 30 days    |       |
+
+---
+
+## 6. Non-Functional Requirements
+
+| ID      | Requirement | Status |
+|---------|-------------|--------|
+| NFR-001 | The system shall respond to user actions within 2 seconds under normal load. | Explicit |
+| NFR-002 | The system shall maintain a full audit trail of all data changes. | Explicit |
+
+---
+
+## 7. Out of Scope (Assumed)
+
+- Payroll system integration
+- External calendar synchronisation
+- Leave accrual engine / automatic balance top-up
+- Team-level capacity enforcement (visible but not enforced)
+
+---
+
+## 8. Open Items
+
+None. All clarification questions resolved. See `project/completed-Questions.json` for the accepted answers.
+```
+
+--- FILE: design/modules/module-catalog.json ---
+```json
+{
+  "catalog": {
+    "application": "Leave Management System",
+    "last_updated": "2026-03-27",
+    "modules": [
+      {
+        "id": "MOD-001",
+        "name": "Identity & Access",
+        "description": "Employee records, roles (Employee / Manager / HR Admin), and manager hierarchy. Drives all access control decisions.",
+        "entities": ["ENT-001"],
+        "responsibilities": [
+          "Create and manage employee records",
+          "Assign and change roles",
+          "Maintain manager-to-employee relationships"
+        ],
+        "exposes": [
+          "GET /employees",
+          "GET /employees/{id}",
+          "POST /employees",
+          "PUT /employees/{id}",
+          "GET /employees/{id}/direct-reports"
+        ],
+        "source_refs": ["ACT-001", "ACT-002", "ACT-003", "FR-006", "FR-009"]
+      },
+      {
+        "id": "MOD-002",
+        "name": "Leave Type Management",
+        "description": "HR Admin-managed catalogue of leave types with advance notice rules and balance flags.",
+        "entities": ["ENT-002"],
+        "responsibilities": [
+          "Define and maintain leave types",
+          "Store advance notice requirements per type",
+          "Flag whether a leave type deducts from a balance pool"
+        ],
+        "exposes": [
+          "GET /leave-types",
+          "GET /leave-types/{id}",
+          "POST /leave-types",
+          "PUT /leave-types/{id}",
+          "DELETE /leave-types/{id}"
+        ],
+        "source_refs": ["LT-001", "LT-002", "LT-003", "LT-004", "BR-002", "FR-004"]
+      },
+      {
+        "id": "MOD-003",
+        "name": "Leave Balance",
+        "description": "Tracks each employee's leave entitlement and usage per leave type per year. Updated atomically on approval and restored on cancellation.",
+        "entities": ["ENT-003"],
+        "responsibilities": [
+          "Initialize balances for new employees and new leave years",
+          "Validate available balance before submission",
+          "Deduct balance on approval",
+          "Restore balance on cancellation of approved leave",
+          "Provide balance summary to employees and HR Admin"
+        ],
+        "exposes": [
+          "GET /employees/{id}/balances",
+          "GET /employees/{id}/balances/{leaveTypeId}",
+          "PUT /employees/{id}/balances/{leaveTypeId}"
+        ],
+        "source_refs": ["FR-002", "FR-003", "FR-008", "BR-001", "BR-004"]
+      },
+      {
+        "id": "MOD-004",
+        "name": "Leave Request",
+        "description": "Core module. Handles the full lifecycle of a leave request: submission, validation, approval, rejection, modification, and cancellation.",
+        "entities": ["ENT-004"],
+        "responsibilities": [
+          "Accept and validate new leave requests (balance, advance notice, overlap)",
+          "Route requests to the direct manager",
+          "Process manager approve / reject decisions",
+          "Handle employee modifications of pending or approved requests",
+          "Handle employee cancellations of pending or approved requests",
+          "Trigger balance updates and notifications on state changes"
+        ],
+        "exposes": [
+          "POST /leave-requests",
+          "GET /leave-requests",
+          "GET /leave-requests/{id}",
+          "PUT /leave-requests/{id}",
+          "POST /leave-requests/{id}/approve",
+          "POST /leave-requests/{id}/reject",
+          "POST /leave-requests/{id}/cancel"
+        ],
+        "state_machine": {
+          "states": ["PENDING", "APPROVED", "REJECTED", "CANCELLED"],
+          "transitions": [
+            { "from": "PENDING",  "to": "APPROVED",   "actor": "Manager",   "trigger": "approve" },
+            { "from": "PENDING",  "to": "REJECTED",   "actor": "Manager",   "trigger": "reject" },
+            { "from": "PENDING",  "to": "PENDING",    "actor": "Employee",  "trigger": "modify (re-routes to manager)" },
+            { "from": "PENDING",  "to": "CANCELLED",  "actor": "Employee",  "trigger": "cancel" },
+            { "from": "APPROVED", "to": "PENDING",    "actor": "Employee",  "trigger": "modify (requires re-approval)" },
+            { "from": "APPROVED", "to": "CANCELLED",  "actor": "Employee",  "trigger": "cancel (restores balance)" },
+            { "from": "APPROVED", "to": "CANCELLED",  "actor": "HR Admin",  "trigger": "override cancel" },
+            { "from": "REJECTED", "to": "CANCELLED",  "actor": "HR Admin",  "trigger": "override" }
+          ]
+        },
+        "source_refs": ["FR-001", "FR-002", "FR-004", "FR-005", "FR-006", "FR-007", "FR-008", "FR-010", "FR-011", "FR-012", "BR-003", "BR-004", "BR-005"]
+      },
+      {
+        "id": "MOD-005",
+        "name": "Audit Trail",
+        "description": "Append-only log of all state changes across all leave requests. Satisfies audit and compliance requirements.",
+        "entities": ["ENT-005"],
+        "responsibilities": [
+          "Record every state transition with actor, timestamp, and optional snapshot",
+          "Expose read-only audit log per request and per employee"
+        ],
+        "exposes": [
+          "GET /leave-requests/{id}/audit",
+          "GET /employees/{id}/audit"
+        ],
+        "source_refs": ["FR-015", "FR-016", "NFR-002"]
+      },
+      {
+        "id": "MOD-006",
+        "name": "Notifications",
+        "description": "Email notification dispatch triggered by leave request events. Records delivery status for traceability.",
+        "entities": ["ENT-006"],
+        "responsibilities": [
+          "Determine recipients for each event type",
+          "Compose and dispatch email notifications",
+          "Record notification status (PENDING / SENT / FAILED)"
+        ],
+        "notification_matrix": [
+          { "event": "SUBMITTED",        "recipients": ["Manager"] },
+          { "event": "APPROVED",         "recipients": ["Employee"] },
+          { "event": "REJECTED",         "recipients": ["Employee"] },
+          { "event": "CANCELLED",        "recipients": ["Manager"] },
+          { "event": "MODIFIED_PENDING", "recipients": ["Manager"] },
+          { "event": "MODIFIED_APPROVED","recipients": ["Manager", "HR Admin"] }
+        ],
+        "source_refs": ["FR-013", "FR-013a", "FR-013b", "FR-013c", "FR-013d", "FR-013e"]
+      }
+    ]
+  }
+}
+```
+
+--- FILE: project/project-state.json ---
+```json
+{
+  "current_phase": "database-ready",
+  "last_command": "db:init (database initialization)",
+  "last_run_at": "2026-03-29T23:45:00Z",
+  "completed_commands": [
+    "perform_business_analysis","generate_business_functions","generate_use_cases",
+    "build_system_design","generate_modules","generate_source_code","generate_glossary",
+    "generate_ldm","generate_sample_data","setup_dev_environment","generate_sql","generate_diagrams",
+    "generate_ui_outline","generate_ui_source_code","database_initialization","seed_data_loaded"
+  ],
+  "database_status": {
+    "initialized": true,
+    "tables": 6,
+    "total_records": 48,
+    "tables_detail": {
+      "employees": 5,
+      "leave_types": 4,
+      "leave_balances": 8,
+      "leave_requests": 7,
+      "leave_audit_entries": 12,
+      "notifications": 12
+    }
+  },
+  "frontend_status": {
+    "built": true,
+    "components": 45,
+    "modules": 3,
+    "bundle_size": "~45KB gzipped",
+    "technology": "React 18.2.0 + TypeScript 5.3.0 + Vite 5.0.0"
+  },
+  "failed_commands": [],
+  "artifacts": {
+    "ba/requirements.md": "complete","ba/analysis-status.md": "complete",
+    "ba/business-functions.json": "complete","ba/glossary.md": "complete",
+    "ba/data-model/logical-data-model.json": "complete",
+    "design/application_architecture.json": "complete",
+    "design/modules/module-catalog.json": "complete",
+    "design/sql/schema.sql": "complete","design/sql/schema-state.json": "complete",
+    "output/docs/diagrams/ldm.md": "complete",
+    "output/docs/diagrams/architecture.md": "complete",
+    "output/docs/diagrams/leave-request-flow.md": "complete",
+    "output/docs/diagrams/dataflow.md": "complete",
+    "design/modules/ui/ui-catalog.json": "complete",
+    "design/modules/ui/ui-leave-requests.json": "complete",
+    "design/modules/ui/ui-team-approvals.json": "complete",
+    "design/modules/ui/ui-hr-administration.json": "complete",
+    "ui/src": "complete",
+    "ui/package.json": "complete",
+    "ui/tsconfig.json": "complete",
+    "ui/vite.config.ts": "complete",
+    "ui/README.md": "complete",
+    "design/sql/schema.sql": "complete (hardcoded seed data removed)",
+    "scripts/createTables.js": "complete",
+    "scripts/loadSeedData.js": "complete",
+    "scripts/resetDatabase.js": "new",
+    "scripts/verifyDatabase.js": "new",
+    "SETUP.md": "complete"
+  },
+  "ready_to_run": {
+    "database_backend": "npm run dev",
+    "frontend": "cd ui && npm run dev", 
+    "complete_init": "npm run db:init"
+  },
+  "recommended_next_command": "start_development_servers",
+  "next_valid_commands": [
+    { "command": "start_backend", "reason": "Start Node.js server on port 3000" },
+    { "command": "start_frontend", "reason": "Start React dev server on port 5173" },
+    { "command": "run_integration_tests", "reason": "Test frontend-backend integration" }
+  ]
+}
+```
+
+Produce outputs exactly at the expected paths.

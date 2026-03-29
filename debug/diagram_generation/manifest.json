@@ -1,0 +1,25 @@
+{
+  "skill": "diagram_generation",
+  "generatedAt": "2026-03-29T23:54:09.959Z",
+  "config": "configuration.json",
+  "commandMappings": [],
+  "inputs": {
+    "declaredPatterns": [
+      "ba/data-model/logical-data-model.json",
+      "/dev/leaveManagement/design/application_architecture.json",
+      "/dev/leaveManagement/design/modules/module-catalog.json"
+    ],
+    "includedFiles": [
+      "ba/data-model/logical-data-model.json",
+      "design/application_architecture.json",
+      "design/modules/module-catalog.json"
+    ],
+    "missingPatterns": []
+  },
+  "outputPaths": {
+    "debugDir": "debug/diagram_generation",
+    "prompt": "debug/diagram_generation/ai-prompt.txt",
+    "zip": "debug/diagram_generation/inputs.zip"
+  },
+  "project": null
+}

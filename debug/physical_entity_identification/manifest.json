@@ -1,0 +1,28 @@
+{
+  "skill": "physical_entity_identification",
+  "generatedAt": "2026-03-29T23:54:15.965Z",
+  "config": "configuration.json",
+  "commandMappings": [],
+  "inputs": {
+    "declaredPatterns": [
+      "ba/data-model/logical-data-model.json",
+      "/dev/leaveManagement/ba/requirements.md",
+      "/dev/leaveManagement/design/application_architecture.json",
+      "/dev/ai-mde/architecture/"
+    ],
+    "includedFiles": [
+      "ba/data-model/logical-data-model.json",
+      "ba/requirements.md",
+      "design/application_architecture.json"
+    ],
+    "missingPatterns": [
+      "/dev/ai-mde/architecture/"
+    ]
+  },
+  "outputPaths": {
+    "debugDir": "debug/physical_entity_identification",
+    "prompt": "debug/physical_entity_identification/ai-prompt.txt",
+    "zip": "debug/physical_entity_identification/inputs.zip"
+  },
+  "project": null
+}

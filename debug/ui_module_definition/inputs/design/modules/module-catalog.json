@@ -1,0 +1,137 @@
+{
+  "catalog": {
+    "application": "Leave Management System",
+    "last_updated": "2026-03-27",
+    "modules": [
+      {
+        "id": "MOD-001",
+        "name": "Identity & Access",
+        "description": "Employee records, roles (Employee / Manager / HR Admin), and manager hierarchy. Drives all access control decisions.",
+        "entities": ["ENT-001"],
+        "responsibilities": [
+          "Create and manage employee records",
+          "Assign and change roles",
+          "Maintain manager-to-employee relationships"
+        ],
+        "exposes": [
+          "GET /employees",
+          "GET /employees/{id}",
+          "POST /employees",
+          "PUT /employees/{id}",
+          "GET /employees/{id}/direct-reports"
+        ],
+        "source_refs": ["ACT-001", "ACT-002", "ACT-003", "FR-006", "FR-009"]
+      },
+      {
+        "id": "MOD-002",
+        "name": "Leave Type Management",
+        "description": "HR Admin-managed catalogue of leave types with advance notice rules and balance flags.",
+        "entities": ["ENT-002"],
+        "responsibilities": [
+          "Define and maintain leave types",
+          "Store advance notice requirements per type",
+          "Flag whether a leave type deducts from a balance pool"
+        ],
+        "exposes": [
+          "GET /leave-types",
+          "GET /leave-types/{id}",
+          "POST /leave-types",
+          "PUT /leave-types/{id}",
+          "DELETE /leave-types/{id}"
+        ],
+        "source_refs": ["LT-001", "LT-002", "LT-003", "LT-004", "BR-002", "FR-004"]
+      },
+      {
+        "id": "MOD-003",
+        "name": "Leave Balance",
+        "description": "Tracks each employee's leave entitlement and usage per leave type per year. Updated atomically on approval and restored on cancellation.",
+        "entities": ["ENT-003"],
+        "responsibilities": [
+          "Initialize balances for new employees and new leave years",
+          "Validate available balance before submission",
+          "Deduct balance on approval",
+          "Restore balance on cancellation of approved leave",
+          "Provide balance summary to employees and HR Admin"
+        ],
+        "exposes": [
+          "GET /employees/{id}/balances",
+          "GET /employees/{id}/balances/{leaveTypeId}",
+          "PUT /employees/{id}/balances/{leaveTypeId}"
+        ],
+        "source_refs": ["FR-002", "FR-003", "FR-008", "BR-001", "BR-004"]
+      },
+      {
+        "id": "MOD-004",
+        "name": "Leave Request",
+        "description": "Core module. Handles the full lifecycle of a leave request: submission, validation, approval, rejection, modification, and cancellation.",
+        "entities": ["ENT-004"],
+        "responsibilities": [
+          "Accept and validate new leave requests (balance, advance notice, overlap)",
+          "Route requests to the direct manager",
+          "Process manager approve / reject decisions",
+          "Handle employee modifications of pending or approved requests",
+          "Handle employee cancellations of pending or approved requests",
+          "Trigger balance updates and notifications on state changes"
+        ],
+        "exposes": [
+          "POST /leave-requests",
+          "GET /leave-requests",
+          "GET /leave-requests/{id}",
+          "PUT /leave-requests/{id}",
+          "POST /leave-requests/{id}/approve",
+          "POST /leave-requests/{id}/reject",
+          "POST /leave-requests/{id}/cancel"
+        ],
+        "state_machine": {
+          "states": ["PENDING", "APPROVED", "REJECTED", "CANCELLED"],
+          "transitions": [
+            { "from": "PENDING",  "to": "APPROVED",   "actor": "Manager",   "trigger": "approve" },
+            { "from": "PENDING",  "to": "REJECTED",   "actor": "Manager",   "trigger": "reject" },
+            { "from": "PENDING",  "to": "PENDING",    "actor": "Employee",  "trigger": "modify (re-routes to manager)" },
+            { "from": "PENDING",  "to": "CANCELLED",  "actor": "Employee",  "trigger": "cancel" },
+            { "from": "APPROVED", "to": "PENDING",    "actor": "Employee",  "trigger": "modify (requires re-approval)" },
+            { "from": "APPROVED", "to": "CANCELLED",  "actor": "Employee",  "trigger": "cancel (restores balance)" },
+            { "from": "APPROVED", "to": "CANCELLED",  "actor": "HR Admin",  "trigger": "override cancel" },
+            { "from": "REJECTED", "to": "CANCELLED",  "actor": "HR Admin",  "trigger": "override" }
+          ]
+        },
+        "source_refs": ["FR-001", "FR-002", "FR-004", "FR-005", "FR-006", "FR-007", "FR-008", "FR-010", "FR-011", "FR-012", "BR-003", "BR-004", "BR-005"]
+      },
+      {
+        "id": "MOD-005",
+        "name": "Audit Trail",
+        "description": "Append-only log of all state changes across all leave requests. Satisfies audit and compliance requirements.",
+        "entities": ["ENT-005"],
+        "responsibilities": [
+          "Record every state transition with actor, timestamp, and optional snapshot",
+          "Expose read-only audit log per request and per employee"
+        ],
+        "exposes": [
+          "GET /leave-requests/{id}/audit",
+          "GET /employees/{id}/audit"
+        ],
+        "source_refs": ["FR-015", "FR-016", "NFR-002"]
+      },
+      {
+        "id": "MOD-006",
+        "name": "Notifications",
+        "description": "Email notification dispatch triggered by leave request events. Records delivery status for traceability.",
+        "entities": ["ENT-006"],
+        "responsibilities": [
+          "Determine recipients for each event type",
+          "Compose and dispatch email notifications",
+          "Record notification status (PENDING / SENT / FAILED)"
+        ],
+        "notification_matrix": [
+          { "event": "SUBMITTED",        "recipients": ["Manager"] },
+          { "event": "APPROVED",         "recipients": ["Employee"] },
+          { "event": "REJECTED",         "recipients": ["Employee"] },
+          { "event": "CANCELLED",        "recipients": ["Manager"] },
+          { "event": "MODIFIED_PENDING", "recipients": ["Manager"] },
+          { "event": "MODIFIED_APPROVED","recipients": ["Manager", "HR Admin"] }
+        ],
+        "source_refs": ["FR-013", "FR-013a", "FR-013b", "FR-013c", "FR-013d", "FR-013e"]
+      }
+    ]
+  }
+}

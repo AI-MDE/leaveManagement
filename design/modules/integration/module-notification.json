@@ -1,0 +1,81 @@
+{
+  "moduleId": "MOD-005",
+  "moduleName": "Notification",
+  "table": "notifications",
+  "moduleType": "integration",
+  "entityRef": "design/entities/ent-notification.json",
+  "generates": ["dto", "data_access", "service"],
+  "optimisticLocking": false,
+  "auditRequired": false,
+  "charter": {
+    "responsibilities": [
+      "Listen to domain events from leave-request module",
+      "Resolve correct email recipients per event type using notification matrix",
+      "Compose and dispatch email notifications via IEmailAdapter",
+      "Record notification delivery status (PENDING / SENT / FAILED)"
+    ],
+    "exclusions": [
+      "Leave request state management — owned by MOD-001 leave-request",
+      "Employee email address storage — read from MOD-002 employee",
+      "Notification retry logic — out of scope for this release"
+    ],
+    "dependencies": [
+      { "moduleId": "MOD-002", "moduleName": "employee", "reason": "Resolve recipient email addresses by employee ID" }
+    ],
+    "requirementMapping": [
+      { "ruleId": "FR-013a", "mappedTo": "service", "artifact": "NotificationService", "description": "On SUBMITTED event: notify Manager" },
+      { "ruleId": "FR-013b", "mappedTo": "service", "artifact": "NotificationService", "description": "On APPROVED/REJECTED event: notify Employee" },
+      { "ruleId": "FR-013c", "mappedTo": "service", "artifact": "NotificationService", "description": "On CANCELLED event: notify Manager" },
+      { "ruleId": "FR-013d", "mappedTo": "service", "artifact": "NotificationService", "description": "On MODIFIED_PENDING event: notify Manager" },
+      { "ruleId": "FR-013e", "mappedTo": "service", "artifact": "NotificationService", "description": "On MODIFIED_APPROVED event: notify Manager and HR Admin" }
+    ]
+  },
+  "spec": {
+    "schema": {
+      "table": "notifications",
+      "columns": [
+        { "name": "id",               "type": "uuid",    "required": true,  "default": "gen_random_uuid()" },
+        { "name": "leave_request_id", "type": "uuid",    "required": true,  "default": null, "description": "FK -> leave_requests.id" },
+        { "name": "recipient_id",     "type": "uuid",    "required": true,  "default": null, "description": "FK -> employees.id" },
+        { "name": "event",            "type": "enum",    "required": true,  "default": null, "enum": ["SUBMITTED","APPROVED","REJECTED","CANCELLED","MODIFIED_PENDING","MODIFIED_APPROVED"] },
+        { "name": "channel",          "type": "enum",    "required": true,  "default": "EMAIL", "enum": ["EMAIL"] },
+        { "name": "status",           "type": "enum",    "required": true,  "default": "PENDING", "enum": ["PENDING","SENT","FAILED"] },
+        { "name": "sent_at",          "type": "datetime","required": false, "default": null },
+        { "name": "created_at",       "type": "datetime","required": true,  "default": "now()" }
+      ],
+      "indexes": [
+        { "fields": ["leave_request_id"], "unique": false, "description": "Notifications per request" },
+        { "fields": ["status"],           "unique": false, "where": "status = 'PENDING'", "description": "Pending dispatch queue" }
+      ]
+    },
+    "interfaces": {
+      "service": [
+        {
+          "layer": "service",
+          "name": "dispatch",
+          "command": "DispatchNotificationCommand",
+          "response": "void",
+          "signature": "dispatch(cmd: DispatchNotificationCommand): Promise<void>",
+          "steps": ["resolve recipients from notification matrix", "for each recipient: resolve email via EmployeeQueryService", "compose email body", "call IEmailAdapter.send()", "persist notification record with status SENT or FAILED"],
+          "description": "Dispatches email notifications to resolved recipients for a given leave event",
+          "errorConditions": [
+            "EmailDispatchError — SMTP failure; record status set to FAILED, error not propagated to caller"
+          ]
+        }
+      ]
+    },
+    "notification_matrix": [
+      { "event": "SUBMITTED",         "recipients": ["Manager"] },
+      { "event": "APPROVED",          "recipients": ["Employee"] },
+      { "event": "REJECTED",          "recipients": ["Employee"] },
+      { "event": "CANCELLED",         "recipients": ["Manager"] },
+      { "event": "MODIFIED_PENDING",  "recipients": ["Manager"] },
+      { "event": "MODIFIED_APPROVED", "recipients": ["Manager", "HR Admin"] }
+    ],
+    "rules": [
+      { "id": "RULE-NOT-01", "name": "FailureSilence", "layer": "service", "artifact": "NotificationService", "condition": "IEmailAdapter.send() throws", "action": "set status=FAILED and return — do not propagate error to caller", "elseAction": "set status=SENT" }
+    ],
+    "api": [],
+    "events": { "published": [] }
+  }
+}

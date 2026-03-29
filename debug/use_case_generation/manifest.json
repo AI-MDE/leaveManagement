@@ -1,0 +1,39 @@
+{
+  "skill": "use_case_generation",
+  "generatedAt": "2026-03-29T23:54:23.251Z",
+  "config": "configuration.json",
+  "commandMappings": [
+    "generate_use_cases"
+  ],
+  "inputs": {
+    "declaredPatterns": [
+      "/dev/leaveManagement/ba/requirements.md",
+      "/dev/leaveManagement/ba/use-cases/uc-*.md",
+      "/dev/leaveManagement/ba/business-functions.json",
+      "/dev/leaveManagement/project/project-state.json"
+    ],
+    "includedFiles": [
+      "ba/business-functions.json",
+      "ba/requirements.md",
+      "ba/use-cases/uc-001-submit-leave-request.md",
+      "ba/use-cases/uc-002-modify-leave-request.md",
+      "ba/use-cases/uc-003-cancel-leave-request.md",
+      "ba/use-cases/uc-004-approve-leave-request.md",
+      "ba/use-cases/uc-005-reject-leave-request.md",
+      "ba/use-cases/uc-006-validate-leave-balance.md",
+      "ba/use-cases/uc-007-manage-leave-balances.md",
+      "ba/use-cases/uc-008-manage-leave-types.md",
+      "ba/use-cases/uc-009-send-event-notifications.md",
+      "ba/use-cases/uc-010-view-leave-history.md",
+      "ba/use-cases/uc-011-maintain-audit-trail.md",
+      "project/project-state.json"
+    ],
+    "missingPatterns": []
+  },
+  "outputPaths": {
+    "debugDir": "debug/use_case_generation",
+    "prompt": "debug/use_case_generation/ai-prompt.txt",
+    "zip": "debug/use_case_generation/inputs.zip"
+  },
+  "project": null
+}

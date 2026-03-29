@@ -1,0 +1,191 @@
+{
+  "model": "Logical Data Model — Leave Management System",
+  "version": "1.0",
+  "generated_at": "2026-03-27",
+  "sources": [
+    "ba/requirements.md",
+    "ba/glossary.md",
+    "design/application_architecture.json",
+    "design/entities/ent-*.json"
+  ],
+  "entities": [
+    {
+      "id": "ENT-001",
+      "name": "Employee",
+      "glossary_ref": "GLO-008",
+      "description": "A person who can submit leave requests. A Manager is also an Employee — role drives capability, not a separate table.",
+      "owning_module": "employee",
+      "attributes": [
+        { "name": "id",         "type": "uuid",     "nullable": false, "constraints": ["PK"] },
+        { "name": "name",       "type": "string",   "nullable": false },
+        { "name": "email",      "type": "string",   "nullable": false, "constraints": ["UNIQUE"] },
+        { "name": "manager_id", "type": "uuid",     "nullable": true,  "constraints": ["FK -> Employee.id"], "note": "NULL for top-level employees and HR Admins" },
+        { "name": "role",       "type": "enum",     "nullable": false, "values": ["EMPLOYEE", "MANAGER", "HR_ADMIN"] },
+        { "name": "created_at", "type": "datetime", "nullable": false },
+        { "name": "updated_at", "type": "datetime", "nullable": false }
+      ],
+      "relationships": [
+        { "type": "self",     "target": "Employee",    "cardinality": "many-to-one",  "via": "manager_id",      "description": "Each employee has one direct manager" },
+        { "type": "has_many", "target": "LeaveRequest","cardinality": "one-to-many",  "via": "employee_id",     "description": "An employee submits many leave requests" },
+        { "type": "has_many", "target": "LeaveBalance","cardinality": "one-to-many",  "via": "employee_id",     "description": "An employee has one balance record per leave type per year" }
+      ],
+      "source_refs": ["ACT-001", "ACT-002", "ACT-003", "FR-006", "FR-009"]
+    },
+    {
+      "id": "ENT-002",
+      "name": "LeaveType",
+      "glossary_ref": "GLO-013",
+      "description": "A category of leave with its own rules (advance notice, balance requirement). Managed by HR Admin.",
+      "owning_module": "leave-type",
+      "attributes": [
+        { "name": "id",                  "type": "uuid",    "nullable": false, "constraints": ["PK"] },
+        { "name": "code",                "type": "string",  "nullable": false, "constraints": ["UNIQUE"], "note": "ANNUAL | SICK | UNPAID | MATERNITY_PATERNITY" },
+        { "name": "name",                "type": "string",  "nullable": false },
+        { "name": "advance_notice_days", "type": "integer", "nullable": false, "note": "0 = no advance notice required" },
+        { "name": "requires_balance",    "type": "boolean", "nullable": false, "note": "false for unpaid leave" },
+        { "name": "is_active",           "type": "boolean", "nullable": false, "default": true },
+        { "name": "created_at",          "type": "datetime","nullable": false },
+        { "name": "updated_at",          "type": "datetime","nullable": false }
+      ],
+      "seed_data": [
+        { "code": "ANNUAL",              "name": "Annual Leave",              "advance_notice_days": 14, "requires_balance": true },
+        { "code": "SICK",                "name": "Sick Leave",                "advance_notice_days": 0,  "requires_balance": true },
+        { "code": "UNPAID",              "name": "Unpaid Leave",              "advance_notice_days": 30, "requires_balance": false },
+        { "code": "MATERNITY_PATERNITY", "name": "Maternity/Paternity Leave", "advance_notice_days": 30, "requires_balance": false }
+      ],
+      "relationships": [
+        { "type": "has_many", "target": "LeaveRequest","cardinality": "one-to-many", "via": "leave_type_id" },
+        { "type": "has_many", "target": "LeaveBalance", "cardinality": "one-to-many","via": "leave_type_id" }
+      ],
+      "source_refs": ["LT-001", "LT-002", "LT-003", "LT-004", "BR-002", "FR-004"]
+    },
+    {
+      "id": "ENT-003",
+      "name": "LeaveBalance",
+      "glossary_ref": "GLO-010",
+      "description": "The entitlement and usage record for a specific employee, leave type, and calendar year. Updated on approval; restored on cancellation.",
+      "owning_module": "leave-balance",
+      "attributes": [
+        { "name": "id",            "type": "uuid",    "nullable": false, "constraints": ["PK"] },
+        { "name": "employee_id",   "type": "uuid",    "nullable": false, "constraints": ["FK -> Employee.id"] },
+        { "name": "leave_type_id", "type": "uuid",    "nullable": false, "constraints": ["FK -> LeaveType.id"] },
+        { "name": "total_days",    "type": "decimal", "nullable": false, "note": "Allocated entitlement for the period" },
+        { "name": "used_days",     "type": "decimal", "nullable": false, "default": 0 },
+        { "name": "pending_days",  "type": "decimal", "nullable": false, "default": 0, "note": "Days reserved by pending requests" },
+        { "name": "period_year",   "type": "integer", "nullable": false, "note": "Balances tracked per calendar year" },
+        { "name": "updated_at",    "type": "datetime","nullable": false }
+      ],
+      "unique_constraints": [["employee_id", "leave_type_id", "period_year"]],
+      "relationships": [
+        { "type": "belongs_to", "target": "Employee",  "cardinality": "many-to-one", "via": "employee_id" },
+        { "type": "belongs_to", "target": "LeaveType", "cardinality": "many-to-one", "via": "leave_type_id" }
+      ],
+      "source_refs": ["FR-002", "FR-003", "FR-008", "BR-001", "BR-004", "GLO-010"]
+    },
+    {
+      "id": "ENT-004",
+      "name": "LeaveRequest",
+      "glossary_ref": "GLO-012",
+      "description": "A formal request by an employee for a period of leave. The primary aggregate — owns the leave lifecycle state machine.",
+      "owning_module": "leave-request",
+      "attributes": [
+        { "name": "id",              "type": "uuid",    "nullable": false, "constraints": ["PK"] },
+        { "name": "employee_id",     "type": "uuid",    "nullable": false, "constraints": ["FK -> Employee.id"] },
+        { "name": "leave_type_id",   "type": "uuid",    "nullable": false, "constraints": ["FK -> LeaveType.id"] },
+        { "name": "start_date",      "type": "date",    "nullable": false },
+        { "name": "end_date",        "type": "date",    "nullable": false },
+        { "name": "total_days",      "type": "decimal", "nullable": false, "note": "Calculated at submission" },
+        { "name": "reason",          "type": "string",  "nullable": true },
+        { "name": "status",          "type": "enum",    "nullable": false, "values": ["PENDING", "APPROVED", "REJECTED", "CANCELLED"],
+          "note": "PENDING→APPROVED|REJECTED|CANCELLED; APPROVED→CANCELLED|PENDING (on re-approval)" },
+        { "name": "submitted_at",    "type": "datetime","nullable": false },
+        { "name": "reviewed_at",     "type": "datetime","nullable": true },
+        { "name": "reviewed_by",     "type": "uuid",    "nullable": true, "constraints": ["FK -> Employee.id"], "note": "Manager who acted" },
+        { "name": "manager_comment", "type": "string",  "nullable": true },
+        { "name": "version",         "type": "integer", "nullable": false, "default": 1, "note": "Incremented on each modification" },
+        { "name": "created_at",      "type": "datetime","nullable": false },
+        { "name": "updated_at",      "type": "datetime","nullable": false }
+      ],
+      "business_rules": [
+        { "rule": "BR-001", "description": "Balance must cover total_days at submission (unless HR Admin override)" },
+        { "rule": "BR-002", "description": "start_date must be at least advance_notice_days from submitted_at for the leave type" },
+        { "rule": "BR-003", "description": "No overlap with other PENDING or APPROVED requests for the same employee" },
+        { "rule": "BR-004", "description": "Cancellation of APPROVED request restores balance and notifies manager" },
+        { "rule": "BR-005", "description": "Modification of APPROVED request resets status to PENDING (re-approval required)" }
+      ],
+      "relationships": [
+        { "type": "belongs_to", "target": "Employee",        "cardinality": "many-to-one", "via": "employee_id",   "description": "Requesting employee" },
+        { "type": "belongs_to", "target": "LeaveType",       "cardinality": "many-to-one", "via": "leave_type_id" },
+        { "type": "belongs_to", "target": "Employee",        "cardinality": "many-to-one", "via": "reviewed_by",   "description": "Reviewing manager (nullable)" },
+        { "type": "has_many",   "target": "LeaveAuditEntry", "cardinality": "one-to-many", "via": "leave_request_id" },
+        { "type": "has_many",   "target": "Notification",    "cardinality": "one-to-many", "via": "leave_request_id" }
+      ],
+      "source_refs": ["FR-001", "FR-002", "FR-004", "FR-005", "FR-007", "FR-008", "FR-010", "FR-011", "FR-012", "BR-003", "BR-004", "BR-005"]
+    },
+    {
+      "id": "ENT-005",
+      "name": "LeaveAuditEntry",
+      "glossary_ref": "GLO-004",
+      "description": "Immutable audit record for every state change on a LeaveRequest. Satisfies the full audit trail requirement.",
+      "owning_module": "audit",
+      "attributes": [
+        { "name": "id",               "type": "uuid",    "nullable": false, "constraints": ["PK"] },
+        { "name": "leave_request_id", "type": "uuid",    "nullable": false, "constraints": ["FK -> LeaveRequest.id"] },
+        { "name": "actor_id",         "type": "uuid",    "nullable": false, "constraints": ["FK -> Employee.id"], "note": "Who performed the action" },
+        { "name": "action",           "type": "enum",    "nullable": false,
+          "values": ["SUBMITTED", "APPROVED", "REJECTED", "CANCELLED", "MODIFIED", "BALANCE_RESTORED"] },
+        { "name": "from_status",      "type": "string",  "nullable": true },
+        { "name": "to_status",        "type": "string",  "nullable": true },
+        { "name": "comment",          "type": "string",  "nullable": true },
+        { "name": "snapshot",         "type": "json",    "nullable": true, "note": "Optional point-in-time snapshot of the LeaveRequest" },
+        { "name": "occurred_at",      "type": "datetime","nullable": false }
+      ],
+      "notes": ["Append-only — rows are never updated or deleted"],
+      "relationships": [
+        { "type": "belongs_to", "target": "LeaveRequest", "cardinality": "many-to-one", "via": "leave_request_id" },
+        { "type": "belongs_to", "target": "Employee",     "cardinality": "many-to-one", "via": "actor_id" }
+      ],
+      "source_refs": ["FR-015", "FR-016", "NFR-002"]
+    },
+    {
+      "id": "ENT-006",
+      "name": "Notification",
+      "glossary_ref": "GLO-017",
+      "description": "A record of an email notification sent (or to be sent) to a stakeholder in response to a leave lifecycle event.",
+      "owning_module": "notification",
+      "attributes": [
+        { "name": "id",               "type": "uuid",    "nullable": false, "constraints": ["PK"] },
+        { "name": "leave_request_id", "type": "uuid",    "nullable": false, "constraints": ["FK -> LeaveRequest.id"] },
+        { "name": "recipient_id",     "type": "uuid",    "nullable": false, "constraints": ["FK -> Employee.id"] },
+        { "name": "event",            "type": "enum",    "nullable": false,
+          "values": ["SUBMITTED", "APPROVED", "REJECTED", "CANCELLED", "MODIFIED_PENDING", "MODIFIED_APPROVED"] },
+        { "name": "channel",          "type": "enum",    "nullable": false, "values": ["EMAIL"] },
+        { "name": "sent_at",          "type": "datetime","nullable": true, "note": "NULL if not yet dispatched" },
+        { "name": "status",           "type": "enum",    "nullable": false, "values": ["PENDING", "SENT", "FAILED"] },
+        { "name": "created_at",       "type": "datetime","nullable": false }
+      ],
+      "relationships": [
+        { "type": "belongs_to", "target": "LeaveRequest", "cardinality": "many-to-one", "via": "leave_request_id" },
+        { "type": "belongs_to", "target": "Employee",     "cardinality": "many-to-one", "via": "recipient_id", "description": "Notification recipient" }
+      ],
+      "source_refs": ["FR-013", "FR-013a", "FR-013b", "FR-013c", "FR-013d", "FR-013e"]
+    }
+  ],
+  "relationships_summary": [
+    { "from": "Employee",        "to": "Employee",        "type": "self-reference",  "via": "manager_id",      "cardinality": "many-to-one" },
+    { "from": "Employee",        "to": "LeaveRequest",    "type": "has_many",        "via": "employee_id",     "cardinality": "one-to-many" },
+    { "from": "Employee",        "to": "LeaveBalance",    "type": "has_many",        "via": "employee_id",     "cardinality": "one-to-many" },
+    { "from": "LeaveType",       "to": "LeaveRequest",    "type": "has_many",        "via": "leave_type_id",   "cardinality": "one-to-many" },
+    { "from": "LeaveType",       "to": "LeaveBalance",    "type": "has_many",        "via": "leave_type_id",   "cardinality": "one-to-many" },
+    { "from": "LeaveRequest",    "to": "LeaveAuditEntry", "type": "has_many",        "via": "leave_request_id","cardinality": "one-to-many" },
+    { "from": "LeaveRequest",    "to": "Notification",    "type": "has_many",        "via": "leave_request_id","cardinality": "one-to-many" }
+  ],
+  "module_ownership": {
+    "employee":      ["ENT-001"],
+    "leave-type":    ["ENT-002"],
+    "leave-balance": ["ENT-003"],
+    "leave-request": ["ENT-004"],
+    "audit":         ["ENT-005"],
+    "notification":  ["ENT-006"]
+  }
+}

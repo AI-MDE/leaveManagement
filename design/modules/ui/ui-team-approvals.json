@@ -1,0 +1,190 @@
+{
+  "moduleId": "UI-M02",
+  "moduleName": "Team Approvals",
+  "routePrefix": "/team-approvals",
+  "purpose": "Enables a Manager to review, approve, or reject leave requests from direct reports and monitor team leave history.",
+  "primaryUsers": ["Manager"],
+  "backendModules": ["MOD-004", "MOD-003", "MOD-001"],
+  "pages": [
+    {
+      "id": "/team-approvals/pending",
+      "name": "Pending Requests",
+      "routePath": "/pending",
+      "pattern": "list",
+      "purpose": "Shows the Manager the full list of PENDING leave requests from their direct reports, filterable and drill-through to individual decisions.",
+      "requirementRefs": ["FR-006", "FR-007", "FR-009"],
+      "businessFunctionRef": "BF-004",
+      "requiredRoles": ["Manager"],
+      "shows": [
+        "Employee name",
+        "Leave type",
+        "Start date",
+        "End date",
+        "Total days",
+        "Submitted date",
+        "Request version"
+      ],
+      "actions": [
+        {
+          "label": "Review",
+          "type": "navigate",
+          "navigatesTo": "/team-approvals/pending/:id"
+        }
+      ],
+      "filters": [
+        {
+          "field": "leaveType",
+          "type": "select",
+          "default": null
+        },
+        {
+          "field": "dateRange",
+          "type": "date-range",
+          "default": null
+        }
+      ],
+      "relatedEntities": ["LeaveRequest", "Employee", "LeaveType"],
+      "validation": [],
+      "emptyState": "No pending requests. All leave requests from your team have been reviewed.",
+      "drillsInto": ["/team-approvals/pending/:id"]
+    },
+    {
+      "id": "/team-approvals/pending/:id",
+      "name": "Review Request",
+      "routePath": "/pending/:id",
+      "pattern": "detail",
+      "purpose": "Displays all details of a single pending leave request and allows the Manager to approve or reject it with an optional comment.",
+      "requirementRefs": ["FR-007", "FR-008", "FR-009", "FR-013b"],
+      "businessFunctionRef": "BF-004",
+      "requiredRoles": ["Manager"],
+      "shows": [
+        "Employee name and email",
+        "Leave type",
+        "Start date and end date",
+        "Total days requested",
+        "Employee's available balance for the leave type",
+        "Optional reason provided by employee",
+        "Request version (highlighted if re-submitted after modification)",
+        "Submission date"
+      ],
+      "actions": [
+        {
+          "label": "Approve",
+          "type": "submit",
+          "navigatesTo": "/team-approvals/pending"
+        },
+        {
+          "label": "Reject",
+          "type": "modal",
+          "navigatesTo": "/team-approvals/pending"
+        },
+        {
+          "label": "Back to Pending",
+          "type": "navigate",
+          "navigatesTo": "/team-approvals/pending"
+        }
+      ],
+      "filters": [],
+      "relatedEntities": ["LeaveRequest", "Employee", "LeaveType", "LeaveBalance"],
+      "validation": [],
+      "emptyState": null,
+      "drillsInto": []
+    },
+    {
+      "id": "/team-approvals/history",
+      "name": "Team Leave History",
+      "routePath": "/history",
+      "pattern": "list",
+      "purpose": "Shows the Manager a filterable history of all leave requests from their direct reports across all statuses.",
+      "requirementRefs": ["FR-015"],
+      "businessFunctionRef": "BF-010",
+      "requiredRoles": ["Manager"],
+      "shows": [
+        "Employee name",
+        "Leave type",
+        "Start date",
+        "End date",
+        "Total days",
+        "Status badge",
+        "Submitted date"
+      ],
+      "actions": [
+        {
+          "label": "View Detail",
+          "type": "navigate",
+          "navigatesTo": "/team-approvals/history/:id"
+        }
+      ],
+      "filters": [
+        {
+          "field": "employee",
+          "type": "select",
+          "default": null
+        },
+        {
+          "field": "status",
+          "type": "select",
+          "default": null
+        },
+        {
+          "field": "leaveType",
+          "type": "select",
+          "default": null
+        },
+        {
+          "field": "dateRange",
+          "type": "date-range",
+          "default": null
+        }
+      ],
+      "relatedEntities": ["LeaveRequest", "Employee", "LeaveType"],
+      "validation": [],
+      "emptyState": "No leave history found for your team with the selected filters.",
+      "drillsInto": ["/team-approvals/history/:id"]
+    },
+    {
+      "id": "/team-approvals/history/:id",
+      "name": "Request History Detail",
+      "routePath": "/history/:id",
+      "pattern": "detail",
+      "purpose": "Shows the Manager the complete detail and audit trail of a historical leave request from their direct report.",
+      "requirementRefs": ["FR-015", "FR-016"],
+      "businessFunctionRef": "BF-011",
+      "requiredRoles": ["Manager"],
+      "shows": [
+        "Employee name",
+        "Leave type",
+        "Start date and end date",
+        "Total days",
+        "Status",
+        "Optional reason",
+        "Manager comment",
+        "Audit trail timeline (actor, action, from status, to status, timestamp)"
+      ],
+      "actions": [
+        {
+          "label": "Back to Team History",
+          "type": "navigate",
+          "navigatesTo": "/team-approvals/history"
+        }
+      ],
+      "filters": [],
+      "relatedEntities": ["LeaveRequest", "LeaveAuditEntry", "Employee", "LeaveType"],
+      "validation": [],
+      "emptyState": null,
+      "drillsInto": []
+    }
+  ],
+  "navigation": {
+    "entryPoint": "/team-approvals/pending",
+    "menuVisible": true,
+    "flows": [
+      { "from": "/team-approvals/pending", "to": "/team-approvals/pending/:id", "via": "Review" },
+      { "from": "/team-approvals/pending/:id", "to": "/team-approvals/pending", "via": "Approve" },
+      { "from": "/team-approvals/pending/:id", "to": "/team-approvals/pending", "via": "Reject" },
+      { "from": "/team-approvals/pending/:id", "to": "/team-approvals/pending", "via": "Back to Pending" },
+      { "from": "/team-approvals/history", "to": "/team-approvals/history/:id", "via": "View Detail" },
+      { "from": "/team-approvals/history/:id", "to": "/team-approvals/history", "via": "Back to Team History" }
+    ]
+  }
+}

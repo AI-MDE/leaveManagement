@@ -1,0 +1,95 @@
+{
+  "moduleId": "MOD-006",
+  "moduleName": "Audit",
+  "table": "leave_audit_entries",
+  "moduleType": "integration",
+  "entityRef": "design/entities/ent-leave-audit-entry.json",
+  "generates": ["dto", "data_access", "service", "query_service"],
+  "optimisticLocking": false,
+  "auditRequired": false,
+  "note": "Classified as integration (not reporting) because it owns a table and exposes a write service. Rows are append-only — no update or delete operations are permitted.",
+  "charter": {
+    "responsibilities": [
+      "Accept append-only audit entries from leave-request services",
+      "Persist immutable audit records with actor, action, status transition, and optional snapshot",
+      "Provide read-only audit trail queries for managers and HR Admin"
+    ],
+    "exclusions": [
+      "Leave request state management — owned by MOD-001 leave-request",
+      "Notification dispatch — owned by MOD-005 notification",
+      "Any update or delete of audit records — prohibited by NFR-002"
+    ],
+    "dependencies": [
+      { "moduleId": "MOD-002", "moduleName": "employee", "reason": "Resolve actor name for audit entry reads" }
+    ],
+    "requirementMapping": [
+      { "ruleId": "FR-016", "mappedTo": "service",     "artifact": "AuditService.append()", "description": "Every state change on a leave request must produce an immutable audit entry" },
+      { "ruleId": "NFR-002", "mappedTo": "data_access", "artifact": "AuditRepository",      "description": "Repository exposes insert only — no update or delete methods" },
+      { "ruleId": "FR-015", "mappedTo": "query_service","artifact": "AuditQueryService",    "description": "Full leave history queryable per request and per employee" }
+    ]
+  },
+  "spec": {
+    "schema": {
+      "table": "leave_audit_entries",
+      "columns": [
+        { "name": "id",               "type": "uuid",    "required": true,  "default": "gen_random_uuid()" },
+        { "name": "leave_request_id", "type": "uuid",    "required": true,  "default": null, "description": "FK -> leave_requests.id" },
+        { "name": "actor_id",         "type": "uuid",    "required": true,  "default": null, "description": "FK -> employees.id — who performed the action" },
+        { "name": "action",           "type": "enum",    "required": true,  "default": null, "enum": ["SUBMITTED","APPROVED","REJECTED","CANCELLED","MODIFIED","BALANCE_RESTORED"] },
+        { "name": "from_status",      "type": "string",  "required": false, "default": null },
+        { "name": "to_status",        "type": "string",  "required": false, "default": null },
+        { "name": "comment",          "type": "string",  "required": false, "default": null },
+        { "name": "snapshot",         "type": "jsonb",   "required": false, "default": null, "description": "Optional point-in-time snapshot of the LeaveRequest" },
+        { "name": "occurred_at",      "type": "datetime","required": true,  "default": "now()" }
+      ],
+      "indexes": [
+        { "fields": ["leave_request_id", "occurred_at"], "unique": false, "description": "Chronological audit trail per request" },
+        { "fields": ["actor_id"],                         "unique": false, "description": "Audit entries by actor" }
+      ]
+    },
+    "interfaces": {
+      "service": [
+        {
+          "layer": "service",
+          "name": "append",
+          "command": "AppendAuditEntryCommand",
+          "response": "void",
+          "signature": "append(cmd: AppendAuditEntryCommand): Promise<void>",
+          "steps": ["insert audit entry — no domain layer, no update, no delete"],
+          "description": "Appends an immutable audit entry for a leave request state change",
+          "errorConditions": [
+            "AuditWriteError — database insert failure; caller should surface this as a system error"
+          ]
+        }
+      ],
+      "query_service": [
+        {
+          "layer": "query_service",
+          "name": "getByLeaveRequest",
+          "filters": "{ leaveRequestId: string }",
+          "response": "AuditEntryReadDto[]",
+          "signature": "getByLeaveRequest(filters: { leaveRequestId: string }): Promise<AuditEntryReadDto[]>",
+          "description": "Returns full chronological audit trail for a single leave request",
+          "tablesJoined": ["leave_audit_entries", "employees"]
+        },
+        {
+          "layer": "query_service",
+          "name": "getByEmployee",
+          "filters": "{ employeeId: string, year?: number }",
+          "response": "AuditEntryReadDto[]",
+          "signature": "getByEmployee(filters: { employeeId: string, year?: number }): Promise<AuditEntryReadDto[]>",
+          "description": "Returns all audit entries for leave requests belonging to an employee",
+          "tablesJoined": ["leave_audit_entries", "leave_requests", "employees"]
+        }
+      ]
+    },
+    "rules": [
+      { "id": "RULE-AUD-01", "name": "AppendOnly", "layer": "data_access", "artifact": "AuditRepository", "condition": "any update or delete is attempted", "action": "method does not exist — not exposed on repository interface", "elseAction": "N/A" }
+    ],
+    "api": [
+      { "method": "GET", "path": "/api/leave-requests/:id/audit", "requestDto": null, "responseDto": "AuditEntryReadDto[]", "description": "Audit trail for a specific leave request" },
+      { "method": "GET", "path": "/api/employees/:id/audit",      "requestDto": null, "responseDto": "AuditEntryReadDto[]", "description": "All audit entries for an employee's leave requests" }
+    ],
+    "events": { "published": [] }
+  }
+}

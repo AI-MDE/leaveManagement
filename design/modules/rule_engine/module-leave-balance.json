@@ -1,0 +1,141 @@
+{
+  "moduleId": "MOD-004",
+  "moduleName": "LeaveBalance",
+  "table": "leave_balances",
+  "moduleType": "rule_engine",
+  "entityRef": "design/entities/ent-leave-balance.json",
+  "generates": ["dto", "data_access", "domain", "service", "query_service"],
+  "optimisticLocking": false,
+  "auditRequired": true,
+  "charter": {
+    "responsibilities": [
+      "Track leave entitlement per employee, leave type, and year",
+      "Validate balance sufficiency before a leave request is submitted (BR-001)",
+      "Reserve pending days at submission; deduct used days on approval",
+      "Restore balance on cancellation of an approved request (BR-004)",
+      "Allow HR Admin to set or adjust entitlements"
+    ],
+    "exclusions": [
+      "Leave request lifecycle — owned by MOD-001 leave-request",
+      "Leave type rules (advance notice) — owned by MOD-003 leave-type",
+      "Balance accrual / automatic top-up — out of scope for this release"
+    ],
+    "dependencies": [
+      { "moduleId": "MOD-002", "moduleName": "employee",   "reason": "Validate employee exists before creating balance record" },
+      { "moduleId": "MOD-003", "moduleName": "leave-type", "reason": "Validate leave type exists and check requires_balance flag" }
+    ],
+    "requirementMapping": [
+      { "ruleId": "BR-001", "mappedTo": "domain",   "artifact": "LeaveBalanceRules.assertSufficient()", "description": "Throws InsufficientBalanceError when available < requested" },
+      { "ruleId": "BR-004", "mappedTo": "service",  "artifact": "LeaveBalanceService.restore()",        "description": "Called by CancelLeaveRequestService when cancelling an APPROVED request" },
+      { "ruleId": "FR-002", "mappedTo": "service",  "artifact": "LeaveBalanceService.validateAndReserve()", "description": "Called by SubmitLeaveRequestService before persisting the request" },
+      { "ruleId": "FR-008", "mappedTo": "service",  "artifact": "LeaveBalanceService.deduct()",         "description": "Called by ApproveLeaveRequestService on approval" }
+    ]
+  },
+  "spec": {
+    "schema": {
+      "table": "leave_balances",
+      "columns": [
+        { "name": "id",            "type": "uuid",    "required": true,  "default": "gen_random_uuid()" },
+        { "name": "employee_id",   "type": "uuid",    "required": true,  "default": null, "description": "FK -> employees.id" },
+        { "name": "leave_type_id", "type": "uuid",    "required": true,  "default": null, "description": "FK -> leave_types.id" },
+        { "name": "total_days",    "type": "decimal", "required": true,  "default": null },
+        { "name": "used_days",     "type": "decimal", "required": true,  "default": 0 },
+        { "name": "pending_days",  "type": "decimal", "required": true,  "default": 0 },
+        { "name": "period_year",   "type": "integer", "required": true,  "default": null },
+        { "name": "updated_at",    "type": "datetime","required": true,  "default": "now()" }
+      ],
+      "indexes": [
+        { "fields": ["employee_id", "leave_type_id", "period_year"], "unique": true,  "description": "Composite unique key — one balance per employee/type/year" },
+        { "fields": ["employee_id", "period_year"],                   "unique": false, "description": "Balance list for an employee in a given year" }
+      ]
+    },
+    "interfaces": {
+      "service": [
+        {
+          "layer": "service",
+          "name": "validateAndReserve",
+          "command": "ValidateAndReserveBalanceCommand",
+          "response": "LeaveBalanceResponseDto",
+          "signature": "validateAndReserve(cmd: ValidateAndReserveBalanceCommand, actor: ActorContext): Promise<LeaveBalanceResponseDto>",
+          "steps": ["load balance for employee/type/year", "domain: LeaveBalanceRules.assertSufficient()", "domain: increment pending_days", "save"],
+          "description": "Validates balance sufficiency and reserves days on submission",
+          "errorConditions": [
+            "InsufficientBalanceError — available days < requested total_days",
+            "BalanceNotFoundError — no balance record for employee/type/year"
+          ]
+        },
+        {
+          "layer": "service",
+          "name": "deduct",
+          "command": "DeductBalanceCommand",
+          "response": "LeaveBalanceResponseDto",
+          "signature": "deduct(cmd: DeductBalanceCommand, actor: ActorContext): Promise<LeaveBalanceResponseDto>",
+          "steps": ["load balance", "domain: move pending_days to used_days", "save"],
+          "description": "Converts reserved pending days to used days on approval",
+          "errorConditions": [
+            "BalanceNotFoundError — balance record does not exist"
+          ]
+        },
+        {
+          "layer": "service",
+          "name": "restore",
+          "command": "RestoreBalanceCommand",
+          "response": "LeaveBalanceResponseDto",
+          "signature": "restore(cmd: RestoreBalanceCommand, actor: ActorContext): Promise<LeaveBalanceResponseDto>",
+          "steps": ["load balance", "domain: decrement used_days or pending_days depending on prior status", "save"],
+          "description": "Restores balance when an approved or pending request is cancelled",
+          "errorConditions": [
+            "BalanceNotFoundError — balance record does not exist"
+          ]
+        },
+        {
+          "layer": "service",
+          "name": "setEntitlement",
+          "command": "SetEntitlementCommand",
+          "response": "LeaveBalanceResponseDto",
+          "signature": "setEntitlement(cmd: SetEntitlementCommand, actor: ActorContext): Promise<LeaveBalanceResponseDto>",
+          "steps": ["authorize (role=HR_ADMIN)", "upsert balance record with new total_days", "save"],
+          "description": "HR Admin sets or adjusts the total entitlement for an employee/type/year",
+          "errorConditions": [
+            "ForbiddenError — actor is not HR_ADMIN"
+          ]
+        }
+      ],
+      "query_service": [
+        {
+          "layer": "query_service",
+          "name": "getByEmployee",
+          "filters": "{ employeeId: string, year: number }",
+          "response": "LeaveBalanceReadDto[]",
+          "signature": "getByEmployee(filters: { employeeId: string, year: number }): Promise<LeaveBalanceReadDto[]>",
+          "description": "Returns all balance records for an employee in a given year",
+          "tablesJoined": ["leave_balances", "leave_types"]
+        },
+        {
+          "layer": "query_service",
+          "name": "getByEmployeeAndType",
+          "filters": "{ employeeId: string, leaveTypeId: string, year: number }",
+          "response": "LeaveBalanceReadDto",
+          "signature": "getByEmployeeAndType(filters: { employeeId: string, leaveTypeId: string, year: number }): Promise<LeaveBalanceReadDto>",
+          "description": "Returns a single balance record for an employee/type/year",
+          "tablesJoined": ["leave_balances", "leave_types"]
+        }
+      ]
+    },
+    "rules": [
+      { "id": "RULE-LB-01", "name": "BalanceSufficiency", "layer": "domain",  "artifact": "LeaveBalanceRules", "condition": "(total_days - used_days - pending_days) < requested_days", "action": "throw InsufficientBalanceError", "elseAction": "proceed" },
+      { "id": "RULE-LB-02", "name": "SkipIfNoBalance",    "layer": "service", "artifact": "LeaveBalanceService", "condition": "leave_type.requires_balance == false", "action": "skip all balance operations", "elseAction": "proceed normally" }
+    ],
+    "api": [
+      { "method": "GET",  "path": "/api/employees/:employeeId/balances",                           "requestDto": null,                      "responseDto": "LeaveBalanceReadDto[]",  "description": "Get all balances for an employee" },
+      { "method": "GET",  "path": "/api/employees/:employeeId/balances/:leaveTypeId",              "requestDto": null,                      "responseDto": "LeaveBalanceReadDto",    "description": "Get balance for a specific leave type" },
+      { "method": "PUT",  "path": "/api/employees/:employeeId/balances/:leaveTypeId",              "requestDto": "LeaveBalanceRequestDto",  "responseDto": "LeaveBalanceResponseDto","description": "HR Admin sets entitlement" }
+    ],
+    "events": {
+      "published": [
+        { "eventType": "LeaveBalanceDeductedEvent", "trigger": "deduct",  "payloadFields": ["employeeId", "leaveTypeId", "periodYear", "totalDays", "usedDays", "pendingDays"] },
+        { "eventType": "LeaveBalanceRestoredEvent", "trigger": "restore", "payloadFields": ["employeeId", "leaveTypeId", "periodYear", "totalDays", "usedDays", "pendingDays"] }
+      ]
+    }
+  }
+}

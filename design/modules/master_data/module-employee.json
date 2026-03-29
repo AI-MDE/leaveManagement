@@ -1,0 +1,118 @@
+{
+  "moduleId": "MOD-002",
+  "moduleName": "Employee",
+  "table": "employees",
+  "moduleType": "master_data",
+  "entityRef": "design/entities/ent-employee.json",
+  "generates": ["dto", "data_access", "domain", "service", "query_service"],
+  "optimisticLocking": true,
+  "auditRequired": false,
+  "charter": {
+    "responsibilities": [
+      "Own employee identity: name, email, role",
+      "Own the manager hierarchy (manager_id self-reference)",
+      "Enforce role uniqueness and email uniqueness",
+      "Provide employee lookup for all other modules"
+    ],
+    "exclusions": [
+      "Leave requests — owned by MOD-001 leave-request",
+      "Leave balances — owned by MOD-004 leave-balance",
+      "Authentication and session management — outside system scope"
+    ],
+    "dependencies": [],
+    "requirementMapping": [
+      { "ruleId": "FR-006", "mappedTo": "query_service", "artifact": "EmployeeQueryService.getById", "description": "Other modules resolve manager_id from Employee to route approval" },
+      { "ruleId": "FR-009", "mappedTo": "domain",        "artifact": "EmployeeEntity",               "description": "Single-level approval enforced by manager_id field on Employee" }
+    ]
+  },
+  "spec": {
+    "schema": {
+      "table": "employees",
+      "columns": [
+        { "name": "id",         "type": "uuid",    "required": true,  "default": "gen_random_uuid()" },
+        { "name": "name",       "type": "string",  "required": true,  "default": null },
+        { "name": "email",      "type": "string",  "required": true,  "default": null },
+        { "name": "manager_id", "type": "uuid",    "required": false, "default": null, "description": "FK -> employees.id; NULL for top-level / HR Admin" },
+        { "name": "role",       "type": "enum",    "required": true,  "default": null, "enum": ["EMPLOYEE", "MANAGER", "HR_ADMIN"] },
+        { "name": "created_at", "type": "datetime","required": true,  "default": "now()" },
+        { "name": "updated_at", "type": "datetime","required": true,  "default": "now()" }
+      ],
+      "indexes": [
+        { "fields": ["email"],      "unique": true,  "description": "Email uniqueness" },
+        { "fields": ["manager_id"], "unique": false, "description": "Direct reports lookup" }
+      ]
+    },
+    "interfaces": {
+      "service": [
+        {
+          "layer": "service",
+          "name": "create",
+          "command": "CreateEmployeeCommand",
+          "response": "EmployeeResponseDto",
+          "signature": "create(cmd: CreateEmployeeCommand, actor: ActorContext): Promise<EmployeeResponseDto>",
+          "steps": ["authorize (role=HR_ADMIN)", "validate email uniqueness", "domain: EmployeeEntity.create()", "save", "emit EmployeeCreatedEvent"],
+          "description": "Creates a new employee record",
+          "errorConditions": [
+            "ForbiddenError — actor is not HR_ADMIN",
+            "DuplicateEmailError — email already exists"
+          ]
+        },
+        {
+          "layer": "service",
+          "name": "update",
+          "command": "UpdateEmployeeCommand",
+          "response": "EmployeeResponseDto",
+          "signature": "update(cmd: UpdateEmployeeCommand, actor: ActorContext): Promise<EmployeeResponseDto>",
+          "steps": ["authorize (role=HR_ADMIN)", "load entity", "domain: apply updates", "save"],
+          "description": "Updates employee name, email, role, or manager assignment",
+          "errorConditions": [
+            "ForbiddenError — actor is not HR_ADMIN",
+            "EmployeeNotFoundError — employee does not exist",
+            "DuplicateEmailError — new email already in use"
+          ]
+        }
+      ],
+      "query_service": [
+        {
+          "layer": "query_service",
+          "name": "getById",
+          "filters": "{ id: string }",
+          "response": "EmployeeReadDto",
+          "signature": "getById(filters: { id: string }): Promise<EmployeeReadDto>",
+          "description": "Returns a single employee by ID",
+          "tablesJoined": ["employees"]
+        },
+        {
+          "layer": "query_service",
+          "name": "getDirectReports",
+          "filters": "{ managerId: string }",
+          "response": "EmployeeReadDto[]",
+          "signature": "getDirectReports(filters: { managerId: string }): Promise<EmployeeReadDto[]>",
+          "description": "Returns all employees whose manager_id matches the given manager",
+          "tablesJoined": ["employees"]
+        },
+        {
+          "layer": "query_service",
+          "name": "getAll",
+          "filters": "{ role?: string }",
+          "response": "EmployeeReadDto[]",
+          "signature": "getAll(filters: { role?: string }): Promise<EmployeeReadDto[]>",
+          "description": "Returns all employees, optionally filtered by role",
+          "tablesJoined": ["employees"]
+        }
+      ]
+    },
+    "rules": [
+      { "id": "RULE-EMP-01", "name": "EmailUniqueness", "layer": "service", "artifact": "EmployeeService", "condition": "email already exists in employees table", "action": "throw DuplicateEmailError", "elseAction": "proceed" },
+      { "id": "RULE-EMP-02", "name": "HrAdminOnly",     "layer": "service", "artifact": "EmployeeService", "condition": "actor.role != HR_ADMIN", "action": "throw ForbiddenError", "elseAction": "proceed" }
+    ],
+    "api": [
+      { "method": "GET",  "path": "/api/employees",      "requestDto": null,                  "responseDto": "EmployeeReadDto[]",  "description": "List all employees" },
+      { "method": "GET",  "path": "/api/employees/:id",  "requestDto": null,                  "responseDto": "EmployeeReadDto",    "description": "Get employee by ID" },
+      { "method": "POST", "path": "/api/employees",      "requestDto": "EmployeeRequestDto",  "responseDto": "EmployeeResponseDto","description": "Create a new employee" },
+      { "method": "PUT",  "path": "/api/employees/:id",  "requestDto": "EmployeeRequestDto",  "responseDto": "EmployeeResponseDto","description": "Update an employee" },
+      { "method": "GET",  "path": "/api/employees/:id/direct-reports", "requestDto": null,    "responseDto": "EmployeeReadDto[]",  "description": "Get direct reports for a manager" }
+    ],
+    "events": { "published": [] }
+  }
+}

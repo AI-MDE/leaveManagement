@@ -1,0 +1,108 @@
+{
+  "generated_at": "2026-03-27",
+  "dialect": "PostgreSQL 14+",
+  "schema_file": "design/sql/schema.sql",
+  "tables": {
+    "employees": {
+      "columns": {
+        "id":          { "type": "CHAR(36)",     "nullable": false, "default": null,                "pk": true },
+        "name":        { "type": "VARCHAR(255)",  "nullable": false, "default": null },
+        "email":       { "type": "VARCHAR(255)",  "nullable": false, "default": null },
+        "manager_id":  { "type": "CHAR(36)",      "nullable": true,  "default": null, "fk": "employees.id" },
+        "role":        { "type": "VARCHAR(20)",   "nullable": false, "default": null,
+                         "check": "IN ('EMPLOYEE','MANAGER','HR_ADMIN')" },
+        "created_at":  { "type": "DATETIME",      "nullable": false, "default": "CURRENT_TIMESTAMP" },
+        "updated_at":  { "type": "DATETIME",      "nullable": false, "default": "CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP" }
+      },
+      "indexes": ["uq_employees_email", "idx_employees_manager"],
+      "entity_ref": "ENT-001"
+    },
+    "leave_types": {
+      "columns": {
+        "id":                   { "type": "CHAR(36)",    "nullable": false, "pk": true },
+        "code":                 { "type": "VARCHAR(50)", "nullable": false },
+        "name":                 { "type": "VARCHAR(100)","nullable": false },
+        "advance_notice_days":  { "type": "INT",         "nullable": false, "default": "0" },
+        "requires_balance":     { "type": "TINYINT(1)",  "nullable": false, "default": "1" },
+        "is_active":            { "type": "TINYINT(1)",  "nullable": false, "default": "1" },
+        "created_at":           { "type": "DATETIME",    "nullable": false, "default": "CURRENT_TIMESTAMP" },
+        "updated_at":           { "type": "DATETIME",    "nullable": false, "default": "CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP" }
+      },
+      "indexes": ["uq_leave_types_code"],
+      "entity_ref": "ENT-002"
+    },
+    "leave_balances": {
+      "columns": {
+        "id":             { "type": "CHAR(36)",     "nullable": false, "pk": true },
+        "employee_id":    { "type": "CHAR(36)",     "nullable": false, "fk": "employees.id" },
+        "leave_type_id":  { "type": "CHAR(36)",     "nullable": false, "fk": "leave_types.id" },
+        "total_days":     { "type": "DECIMAL(5,1)", "nullable": false },
+        "used_days":      { "type": "DECIMAL(5,1)", "nullable": false, "default": "0" },
+        "pending_days":   { "type": "DECIMAL(5,1)", "nullable": false, "default": "0" },
+        "period_year":    { "type": "SMALLINT",     "nullable": false },
+        "updated_at":     { "type": "DATETIME",     "nullable": false, "default": "CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP" }
+      },
+      "indexes": ["uq_leave_balances_emp_type_year", "idx_leave_balances_employee"],
+      "entity_ref": "ENT-003"
+    },
+    "leave_requests": {
+      "columns": {
+        "id":               { "type": "CHAR(36)",     "nullable": false, "pk": true },
+        "employee_id":      { "type": "CHAR(36)",     "nullable": false, "fk": "employees.id" },
+        "leave_type_id":    { "type": "CHAR(36)",     "nullable": false, "fk": "leave_types.id" },
+        "start_date":       { "type": "DATE",         "nullable": false },
+        "end_date":         { "type": "DATE",         "nullable": false },
+        "total_days":       { "type": "DECIMAL(5,1)", "nullable": false },
+        "reason":           { "type": "TEXT",         "nullable": true },
+        "status":           { "type": "VARCHAR(20)",  "nullable": false, "default": "PENDING",
+                              "check": "IN ('PENDING','APPROVED','REJECTED','CANCELLED')" },
+        "submitted_at":     { "type": "DATETIME",     "nullable": false, "default": "CURRENT_TIMESTAMP" },
+        "reviewed_at":      { "type": "DATETIME",     "nullable": true },
+        "reviewed_by":      { "type": "CHAR(36)",     "nullable": true,  "fk": "employees.id" },
+        "manager_comment":  { "type": "TEXT",         "nullable": true },
+        "version":          { "type": "INT",          "nullable": false, "default": "1" },
+        "created_at":       { "type": "DATETIME",     "nullable": false, "default": "CURRENT_TIMESTAMP" },
+        "updated_at":       { "type": "DATETIME",     "nullable": false, "default": "CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP" }
+      },
+      "indexes": [
+        "idx_leave_requests_employee_status",
+        "idx_leave_requests_reviewed_by",
+        "idx_leave_requests_dates"
+      ],
+      "entity_ref": "ENT-004"
+    },
+    "leave_audit_entries": {
+      "columns": {
+        "id":               { "type": "CHAR(36)",  "nullable": false, "pk": true },
+        "leave_request_id": { "type": "CHAR(36)",  "nullable": false, "fk": "leave_requests.id" },
+        "actor_id":         { "type": "CHAR(36)",  "nullable": false, "fk": "employees.id" },
+        "action":           { "type": "VARCHAR(30)","nullable": false,
+                              "check": "IN ('SUBMITTED','APPROVED','REJECTED','CANCELLED','MODIFIED','BALANCE_RESTORED')" },
+        "from_status":      { "type": "VARCHAR(20)","nullable": true },
+        "to_status":        { "type": "VARCHAR(20)","nullable": true },
+        "comment":          { "type": "TEXT",       "nullable": true },
+        "snapshot":         { "type": "JSON",       "nullable": true },
+        "occurred_at":      { "type": "DATETIME",   "nullable": false, "default": "CURRENT_TIMESTAMP" }
+      },
+      "indexes": ["idx_audit_leave_request", "idx_audit_actor"],
+      "entity_ref": "ENT-005"
+    },
+    "notifications": {
+      "columns": {
+        "id":               { "type": "CHAR(36)",  "nullable": false, "pk": true },
+        "leave_request_id": { "type": "CHAR(36)",  "nullable": false, "fk": "leave_requests.id" },
+        "recipient_id":     { "type": "CHAR(36)",  "nullable": false, "fk": "employees.id" },
+        "event":            { "type": "VARCHAR(30)","nullable": false,
+                              "check": "IN ('SUBMITTED','APPROVED','REJECTED','CANCELLED','MODIFIED_PENDING','MODIFIED_APPROVED')" },
+        "channel":          { "type": "VARCHAR(10)","nullable": false, "default": "EMAIL",
+                              "check": "IN ('EMAIL')" },
+        "status":           { "type": "VARCHAR(10)","nullable": false, "default": "PENDING",
+                              "check": "IN ('PENDING','SENT','FAILED')" },
+        "sent_at":          { "type": "DATETIME",   "nullable": true },
+        "created_at":       { "type": "DATETIME",   "nullable": false, "default": "CURRENT_TIMESTAMP" }
+      },
+      "indexes": ["idx_notifications_request", "idx_notifications_recipient", "idx_notifications_status"],
+      "entity_ref": "ENT-006"
+    }
+  }
+}

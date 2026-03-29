@@ -1,0 +1,31 @@
+{
+  "entity": {
+    "id": "ENT-002",
+    "name": "LeaveType",
+    "description": "A category of leave with its own rules (advance notice, balance tracking). Managed by HR Admin.",
+    "attributes": [
+      { "name": "id",                  "type": "uuid",    "constraints": ["PK", "NOT NULL"] },
+      { "name": "code",                "type": "string",  "constraints": ["NOT NULL", "UNIQUE"],
+        "note": "e.g. ANNUAL, SICK, UNPAID, MATERNITY_PATERNITY" },
+      { "name": "name",                "type": "string",  "constraints": ["NOT NULL"] },
+      { "name": "advance_notice_days", "type": "integer", "constraints": ["NOT NULL"],
+        "note": "0 = no advance notice required (e.g. Sick Leave)" },
+      { "name": "requires_balance",    "type": "boolean", "constraints": ["NOT NULL"],
+        "note": "false = Unpaid leave does not deduct from a balance pool" },
+      { "name": "is_active",           "type": "boolean", "constraints": ["NOT NULL", "DEFAULT true"] },
+      { "name": "created_at",          "type": "datetime","constraints": ["NOT NULL"] },
+      { "name": "updated_at",          "type": "datetime","constraints": ["NOT NULL"] }
+    ],
+    "seed_data": [
+      { "code": "ANNUAL",              "name": "Annual Leave",              "advance_notice_days": 14, "requires_balance": true },
+      { "code": "SICK",                "name": "Sick Leave",                "advance_notice_days": 0,  "requires_balance": true },
+      { "code": "UNPAID",              "name": "Unpaid Leave",              "advance_notice_days": 30, "requires_balance": false },
+      { "code": "MATERNITY_PATERNITY", "name": "Maternity/Paternity Leave", "advance_notice_days": 30, "requires_balance": false }
+    ],
+    "relationships": [
+      { "type": "has_many", "target": "LeaveRequest", "cardinality": "one-to-many", "description": "A LeaveType appears on many LeaveRequests" },
+      { "type": "has_many", "target": "LeaveBalance",  "cardinality": "one-to-many", "description": "A LeaveType has one LeaveBalance per Employee" }
+    ],
+    "source_refs": ["LT-001", "LT-002", "LT-003", "LT-004", "BR-002", "FR-004"]
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "additionalDirectories": [
+      "\\dev\\ai-mde\\architecture",
+      "c:\\dev\\ai-mde\\architecture",
+      "\\dev\\ai-mde\\web",
+      "c:\\dev\\ai-mde\\web"
+    ]
+  }
+}

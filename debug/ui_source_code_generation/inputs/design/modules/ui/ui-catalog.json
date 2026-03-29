@@ -1,0 +1,62 @@
+{
+  "application": "Leave Management System",
+  "generated_at": "2026-03-29",
+  "menu": [
+    {
+      "moduleId": "UI-M01",
+      "label": "My Leave",
+      "icon": "calendar",
+      "route": "/my-leave/dashboard",
+      "order": 1
+    },
+    {
+      "moduleId": "UI-M02",
+      "label": "Team Approvals",
+      "icon": "users",
+      "route": "/team-approvals/pending",
+      "order": 2
+    },
+    {
+      "moduleId": "UI-M03",
+      "label": "HR Administration",
+      "icon": "clipboard",
+      "route": "/hr-administration/leave-types",
+      "order": 3
+    }
+  ],
+  "modules": [
+    {
+      "id": "UI-M01",
+      "name": "My Leave",
+      "menuLabel": "My Leave",
+      "icon": "calendar",
+      "routePrefix": "/my-leave",
+      "purpose": "Enables an Employee to view their leave balances and history, submit new leave requests, and modify or cancel existing ones.",
+      "primaryUsers": ["Employee"],
+      "backendModules": ["MOD-004", "MOD-003", "MOD-002"],
+      "priority": "core"
+    },
+    {
+      "id": "UI-M02",
+      "name": "Team Approvals",
+      "menuLabel": "Team Approvals",
+      "icon": "users",
+      "routePrefix": "/team-approvals",
+      "purpose": "Enables a Manager to review, approve, or reject leave requests from direct reports and monitor team leave history.",
+      "primaryUsers": ["Manager"],
+      "backendModules": ["MOD-004", "MOD-003", "MOD-001"],
+      "priority": "core"
+    },
+    {
+      "id": "UI-M03",
+      "name": "HR Administration",
+      "menuLabel": "HR Administration",
+      "icon": "clipboard",
+      "routePrefix": "/hr-administration",
+      "purpose": "Enables HR Admin to manage leave types, set employee balances, oversee all requests system-wide, and review the audit trail.",
+      "primaryUsers": ["HR Admin"],
+      "backendModules": ["MOD-002", "MOD-003", "MOD-004", "MOD-005", "MOD-006", "MOD-001"],
+      "priority": "core"
+    }
+  ]
+}
