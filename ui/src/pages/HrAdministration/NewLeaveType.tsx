@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { leaveTypeApi } from '@api/leave-type';
 import type { LeaveType } from '../../types/LeaveType';
 
@@ -15,10 +15,12 @@ export const NewLeaveType: React.FC = () => {
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  const queryClient = useQueryClient();
   const mutation = useMutation({
     mutationFn: (leaveType: Omit<LeaveType, 'id' | 'createdAt' | 'updatedAt'>) =>
       leaveTypeApi.create(leaveType),
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['leaveTypes'] });
       navigate('/hr-administration/leave-types');
     },
   });
@@ -147,7 +149,7 @@ export const NewLeaveType: React.FC = () => {
 
         {mutation.isError && (
           <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
-            Error creating leave type. Please try again.
+            {(mutation.error as any)?.response?.data?.error ?? (mutation.error as any)?.message ?? 'Error creating leave type. Please try again.'}
           </div>
         )}
       </form>

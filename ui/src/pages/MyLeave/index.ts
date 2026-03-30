@@ -3,3 +3,4 @@ export { Dashboard } from './Dashboard';
 export { SubmitLeaveRequest } from './New';
 export { MyLeaveRequests } from './Requests';
 export { RequestDetail } from './RequestDetail';
+export { ModifyLeaveRequest } from './ModifyRequest';

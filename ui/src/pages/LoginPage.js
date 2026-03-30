@@ -22,7 +22,7 @@ export const LoginPage = () => {
                 name: 'John Doe',
                 email,
                 managerId: null,
-                role: 'EMPLOYEE',
+                role: 'HR_ADMIN',
                 createdAt: new Date().toISOString(),
                 updatedAt: new Date().toISOString(),
             };

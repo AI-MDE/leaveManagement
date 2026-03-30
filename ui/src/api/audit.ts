@@ -15,7 +15,7 @@ export const auditApi = {
   },
 
   // Get all audit entries (HR Admin only)
-  getAll: async (): Promise<LeaveAuditEntry[]> => {
+  getAll: async (): Promise<LeaveAuditEntryDetail[]> => {
     const response = await apiClient.get('/audit');
     return response.data;
   },

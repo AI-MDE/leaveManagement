@@ -1,6 +1,6 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import { Suspense, lazy } from 'react';
-import { createBrowserRouter, RouterProvider, Outlet } from 'react-router-dom';
+import { createBrowserRouter, RouterProvider, Outlet, Navigate } from 'react-router-dom';
 import { AuthGuard } from '@layout/AuthGuard';
 import { AppShell } from '@layout/AppShell';
 import { LoginPage } from '@pages/LoginPage';
@@ -9,13 +9,19 @@ const MyLeaveDashboard = lazy(() => import('@pages/MyLeave/Dashboard').then(m =>
 const MyLeaveNew = lazy(() => import('@pages/MyLeave/New').then(m => ({ default: m.SubmitLeaveRequest })));
 const MyLeaveRequests = lazy(() => import('@pages/MyLeave/Requests').then(m => ({ default: m.MyLeaveRequests })));
 const MyLeaveRequestDetail = lazy(() => import('@pages/MyLeave/RequestDetail').then(m => ({ default: m.RequestDetail })));
+const MyLeaveModifyRequest = lazy(() => import('@pages/MyLeave/ModifyRequest').then(m => ({ default: m.ModifyLeaveRequest })));
 const TeamApprovingPending = lazy(() => import('@pages/TeamApprovals/Pending').then(m => ({ default: m.PendingRequests })));
 const TeamApprovalsReview = lazy(() => import('@pages/TeamApprovals/Review').then(m => ({ default: m.ReviewRequest })));
 const TeamApprovalsHistory = lazy(() => import('@pages/TeamApprovals/History').then(m => ({ default: m.TeamLeaveHistory })));
+const TeamApprovalsHistoryDetail = lazy(() => import('@pages/TeamApprovals/HistoryDetail').then(m => ({ default: m.HistoryDetail })));
 const HrAdminLeaveTypes = lazy(() => import('@pages/HrAdministration/LeaveTypes').then(m => ({ default: m.LeaveTypes })));
 const HrAdminNewLeaveType = lazy(() => import('@pages/HrAdministration/NewLeaveType').then(m => ({ default: m.NewLeaveType })));
 const HrAdminEditLeaveType = lazy(() => import('@pages/HrAdministration/EditLeaveType').then(m => ({ default: m.EditLeaveType })));
 const HrAdminBalances = lazy(() => import('@pages/HrAdministration/Balances').then(m => ({ default: m.EmployeeBalances })));
+const HrAdminSetBalance = lazy(() => import('@pages/HrAdministration/SetBalance').then(m => ({ default: m.SetBalance })));
+const HrAdminRequests = lazy(() => import('@pages/HrAdministration/Requests').then(m => ({ default: m.AllRequests })));
+const HrAdminRequestDetail = lazy(() => import('@pages/HrAdministration/RequestDetail').then(m => ({ default: m.HrRequestDetail })));
+const HrAdminAuditTrail = lazy(() => import('@pages/HrAdministration/AuditTrail').then(m => ({ default: m.AuditTrail })));
 // Layout wrapper for authenticated routes
 const AuthenticatedLayout = () => (_jsx(AuthGuard, { children: _jsx(AppShell, { children: _jsx(Suspense, { fallback: _jsx(LoadingSpinner, {}), children: _jsx(Outlet, {}) }) }) }));
 // Loading spinner component
@@ -31,6 +37,8 @@ const router = createBrowserRouter([
         path: '/',
         element: _jsx(AuthenticatedLayout, {}),
         children: [
+            // Default redirect
+            { index: true, element: _jsx(Navigate, { to: "/my-leave/dashboard", replace: true }) },
             // My Leave Module
             {
                 path: 'my-leave',
@@ -39,6 +47,7 @@ const router = createBrowserRouter([
                     { path: 'new', element: _jsx(MyLeaveNew, {}) },
                     { path: 'requests', element: _jsx(MyLeaveRequests, {}) },
                     { path: 'requests/:id', element: _jsx(MyLeaveRequestDetail, {}) },
+                    { path: 'requests/:id/modify', element: _jsx(MyLeaveModifyRequest, {}) },
                 ],
             },
             // Team Approvals Module
@@ -48,6 +57,7 @@ const router = createBrowserRouter([
                     { path: 'pending', element: _jsx(TeamApprovingPending, {}) },
                     { path: 'pending/:id', element: _jsx(TeamApprovalsReview, {}) },
                     { path: 'history', element: _jsx(TeamApprovalsHistory, {}) },
+                    { path: 'history/:id', element: _jsx(TeamApprovalsHistoryDetail, {}) },
                 ],
             },
             // HR Administration Module
@@ -58,6 +68,10 @@ const router = createBrowserRouter([
                     { path: 'leave-types/new', element: _jsx(HrAdminNewLeaveType, {}) },
                     { path: 'leave-types/:id/edit', element: _jsx(HrAdminEditLeaveType, {}) },
                     { path: 'balances', element: _jsx(HrAdminBalances, {}) },
+                    { path: 'balances/set', element: _jsx(HrAdminSetBalance, {}) },
+                    { path: 'requests', element: _jsx(HrAdminRequests, {}) },
+                    { path: 'requests/:id', element: _jsx(HrAdminRequestDetail, {}) },
+                    { path: 'audit', element: _jsx(HrAdminAuditTrail, {}) },
                 ],
             },
         ],

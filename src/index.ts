@@ -147,6 +147,73 @@ app.get('/api/leave-types', async (req: Request, res: Response) => {
   }
 });
 
+// POST /api/leave-types - Create a new leave type
+app.post('/api/leave-types', async (req: Request, res: Response) => {
+  try {
+    const { code, name, advanceNoticeDays, requiresBalance, isActive } = req.body;
+    if (!code || !name) return res.status(400).json({ error: 'code and name are required' });
+    const client = await pool.connect();
+    try {
+      const result = await client.query(
+        `INSERT INTO leave_types (id, code, name, advance_notice_days, requires_balance, is_active, created_at, updated_at)
+         VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, NOW(), NOW()) RETURNING *`,
+        [code, name, advanceNoticeDays ?? 0, requiresBalance ?? true, isActive ?? true]
+      );
+      res.status(201).json(result.rows[0]);
+    } finally {
+      client.release();
+    }
+  } catch (error) {
+    console.error('Error creating leave type:', error);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+// PUT /api/leave-types/:id - Update a leave type
+app.put('/api/leave-types/:id', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { code, name, advanceNoticeDays, requiresBalance, isActive } = req.body;
+    if (!code || !name) return res.status(400).json({ error: 'code and name are required' });
+    const client = await pool.connect();
+    try {
+      const result = await client.query(
+        `UPDATE leave_types SET code=$1, name=$2, advance_notice_days=$3, requires_balance=$4, is_active=$5, updated_at=NOW()
+         WHERE id=$6 RETURNING *`,
+        [code, name, advanceNoticeDays ?? 0, requiresBalance ?? true, isActive ?? true, id]
+      );
+      if (result.rows.length === 0) return res.status(404).json({ error: 'Leave type not found' });
+      res.json(result.rows[0]);
+    } finally {
+      client.release();
+    }
+  } catch (error) {
+    console.error('Error updating leave type:', error);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+// PATCH /api/leave-types/:id/deactivate - Deactivate a leave type
+app.patch('/api/leave-types/:id/deactivate', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const client = await pool.connect();
+    try {
+      const result = await client.query(
+        `UPDATE leave_types SET is_active=false, updated_at=NOW() WHERE id=$1 RETURNING *`,
+        [id]
+      );
+      if (result.rows.length === 0) return res.status(404).json({ error: 'Leave type not found' });
+      res.json(result.rows[0]);
+    } finally {
+      client.release();
+    }
+  } catch (error) {
+    console.error('Error deactivating leave type:', error);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
 // GET /api/leave-types/:id - Get leave type by ID
 app.get('/api/leave-types/:id', async (req: Request, res: Response) => {
   try {
@@ -427,6 +494,193 @@ app.get('/api/leave-requests/:id', async (req: Request, res: Response) => {
     }
   } catch (error) {
     console.error('Error fetching leave request:', error);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+// POST /api/leave-requests - Submit a new leave request
+app.post('/api/leave-requests', async (req: Request, res: Response) => {
+  try {
+    const { leaveTypeId, startDate, endDate, reason } = req.body;
+    if (!leaveTypeId || !startDate || !endDate) {
+      return res.status(400).json({ error: 'leaveTypeId, startDate, and endDate are required' });
+    }
+    const client = await pool.connect();
+    try {
+      // Get default employee (first EMPLOYEE role)
+      const empResult = await client.query('SELECT id FROM employees WHERE role = $1 LIMIT 1', ['EMPLOYEE']);
+      if (empResult.rows.length === 0) return res.status(404).json({ error: 'Employee not found' });
+      const employeeId = empResult.rows[0].id;
+
+      const start = new Date(startDate);
+      const end   = new Date(endDate);
+      const totalDays = Math.ceil((end.getTime() - start.getTime()) / 86400000) + 1;
+
+      const result = await client.query(
+        `INSERT INTO leave_requests
+           (id, employee_id, leave_type_id, start_date, end_date, total_days, reason, status, submitted_at, version, created_at, updated_at)
+         VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, 'PENDING', NOW(), 1, NOW(), NOW())
+         RETURNING *`,
+        [employeeId, leaveTypeId, startDate, endDate, totalDays, reason || null]
+      );
+      res.status(201).json(result.rows[0]);
+    } finally {
+      client.release();
+    }
+  } catch (error) {
+    console.error('Error submitting leave request:', error);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+// PUT /api/leave-requests/:id - Modify a leave request
+app.put('/api/leave-requests/:id', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { startDate, endDate, reason } = req.body;
+    if (!startDate || !endDate) return res.status(400).json({ error: 'startDate and endDate are required' });
+    const totalDays = Math.ceil((new Date(endDate).getTime() - new Date(startDate).getTime()) / 86400000) + 1;
+    const client = await pool.connect();
+    try {
+      const result = await client.query(
+        `UPDATE leave_requests
+         SET start_date=$1, end_date=$2, total_days=$3, reason=$4, status='PENDING', version=version+1, updated_at=NOW()
+         WHERE id=$5 AND status IN ('PENDING','APPROVED')
+         RETURNING *`,
+        [startDate, endDate, totalDays, reason || null, id]
+      );
+      if (result.rows.length === 0) return res.status(404).json({ error: 'Leave request not found or cannot be modified' });
+      res.json(result.rows[0]);
+    } finally {
+      client.release();
+    }
+  } catch (error) {
+    console.error('Error modifying leave request:', error);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+// POST /api/leave-requests/:id/cancel - Cancel a leave request
+app.post('/api/leave-requests/:id/cancel', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const client = await pool.connect();
+    try {
+      const result = await client.query(
+        `UPDATE leave_requests SET status='CANCELLED', updated_at=NOW()
+         WHERE id=$1 AND status IN ('PENDING','APPROVED') RETURNING *`,
+        [id]
+      );
+      if (result.rows.length === 0) return res.status(404).json({ error: 'Leave request not found or cannot be cancelled' });
+      res.json(result.rows[0]);
+    } finally {
+      client.release();
+    }
+  } catch (error) {
+    console.error('Error cancelling leave request:', error);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+// POST /api/leave-requests/:id/approve - Approve a leave request
+app.post('/api/leave-requests/:id/approve', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { managerComment } = req.body;
+    const client = await pool.connect();
+    try {
+      const mgrResult = await client.query('SELECT id FROM employees WHERE role IN ($1,$2) LIMIT 1', ['MANAGER','HR_ADMIN']);
+      const reviewedBy = mgrResult.rows[0]?.id || null;
+      const result = await client.query(
+        `UPDATE leave_requests
+         SET status='APPROVED', manager_comment=$1, reviewed_by=$2, reviewed_at=NOW(), updated_at=NOW()
+         WHERE id=$3 AND status='PENDING' RETURNING *`,
+        [managerComment || null, reviewedBy, id]
+      );
+      if (result.rows.length === 0) return res.status(404).json({ error: 'Leave request not found or not pending' });
+      res.json(result.rows[0]);
+    } finally {
+      client.release();
+    }
+  } catch (error) {
+    console.error('Error approving leave request:', error);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+// POST /api/leave-requests/:id/reject - Reject a leave request
+app.post('/api/leave-requests/:id/reject', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { managerComment } = req.body;
+    const client = await pool.connect();
+    try {
+      const mgrResult = await client.query('SELECT id FROM employees WHERE role IN ($1,$2) LIMIT 1', ['MANAGER','HR_ADMIN']);
+      const reviewedBy = mgrResult.rows[0]?.id || null;
+      const result = await client.query(
+        `UPDATE leave_requests
+         SET status='REJECTED', manager_comment=$1, reviewed_by=$2, reviewed_at=NOW(), updated_at=NOW()
+         WHERE id=$3 AND status='PENDING' RETURNING *`,
+        [managerComment || null, reviewedBy, id]
+      );
+      if (result.rows.length === 0) return res.status(404).json({ error: 'Leave request not found or not pending' });
+      res.json(result.rows[0]);
+    } finally {
+      client.release();
+    }
+  } catch (error) {
+    console.error('Error rejecting leave request:', error);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+// PUT /api/employees/:id/balances/:leaveTypeId - Update employee leave balance (HR Admin)
+app.put('/api/employees/:id/balances/:leaveTypeId', async (req: Request, res: Response) => {
+  try {
+    const { id, leaveTypeId } = req.params;
+    const { totalDays } = req.body;
+    if (totalDays === undefined || totalDays < 0) return res.status(400).json({ error: 'totalDays must be a non-negative number' });
+    const year = new Date().getFullYear();
+    const client = await pool.connect();
+    try {
+      // Upsert balance
+      const result = await client.query(
+        `INSERT INTO leave_balances (id, employee_id, leave_type_id, total_days, used_days, pending_days, period_year, updated_at)
+         VALUES (gen_random_uuid(), $1, $2, $3, 0, 0, $4, NOW())
+         ON CONFLICT (employee_id, leave_type_id, period_year)
+         DO UPDATE SET total_days=$3, updated_at=NOW()
+         RETURNING *`,
+        [id, leaveTypeId, totalDays, year]
+      );
+      res.json(result.rows[0]);
+    } finally {
+      client.release();
+    }
+  } catch (error) {
+    console.error('Error updating balance:', error);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+// GET /api/audit - Get all audit entries (HR Admin)
+app.get('/api/audit', async (req: Request, res: Response) => {
+  try {
+    const client = await pool.connect();
+    try {
+      const result = await client.query(
+        `SELECT lae.id, lae.leave_request_id, lae.actor_id, lae.action,
+                lae.from_status, lae.to_status, lae.comment, lae.occurred_at,
+                e.name as actor_name
+         FROM leave_audit_entries lae
+         JOIN employees e ON lae.actor_id = e.id
+         ORDER BY lae.occurred_at DESC`
+      );
+      res.json(result.rows);
+    } finally {
+      client.release();
+    }
+  } catch (error) {
+    console.error('Error fetching all audit entries:', error);
     res.status(500).json({ error: 'Database error' });
   }
 });

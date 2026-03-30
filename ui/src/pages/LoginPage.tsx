@@ -24,7 +24,7 @@ export const LoginPage: React.FC = () => {
         name: 'John Doe',
         email,
         managerId: null,
-        role: 'EMPLOYEE' as const,
+        role: 'HR_ADMIN' as const,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };

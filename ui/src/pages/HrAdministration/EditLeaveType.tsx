@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { leaveTypeApi } from '@api/leave-type';
 
 export const EditLeaveType: React.FC = () => {
@@ -29,9 +29,12 @@ export const EditLeaveType: React.FC = () => {
     }
   }, [leaveType]);
 
+  const queryClient = useQueryClient();
   const mutation = useMutation({
     mutationFn: (data: any) => leaveTypeApi.update(id!, data),
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['leaveTypes'] });
+      queryClient.invalidateQueries({ queryKey: ['leaveType', id] });
       navigate('/hr-administration/leave-types');
     },
   });
@@ -154,7 +157,7 @@ export const EditLeaveType: React.FC = () => {
 
         {mutation.isError && (
           <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
-            Error updating leave type. Please try again.
+            {(mutation.error as any)?.response?.data?.error ?? (mutation.error as any)?.message ?? 'Error updating leave type. Please try again.'}
           </div>
         )}
       </form>
