@@ -6,6 +6,7 @@
     "build": "tsc -p tsconfig.build.json",
     "start": "node dist/index.js",
     "dev": "ts-node src/index.ts",
+    "dev:all": "concurrently -k -n api,ui -c cyan,magenta \"npm run dev\" \"npm --prefix ui run dev\"",
     "reset-database": "node scripts/resetDatabase.js",
     "create-tables": "node scripts/createTables.js",
     "regenerate-seed-data": "node scripts/regenerateSeedData.js",
@@ -13,7 +14,8 @@
     "db:init": "npm run reset-database && npm run create-tables && npm run seed",
     "test": "jest",
     "test:unit": "jest --testPathPattern=test/unit",
-    "test:integration": "jest --testPathPattern=test/integration"
+    "test:integration": "jest --testPathPattern=test/integration",
+    "test:screenshots": "node scripts/takeScreenshots.js"
   },
   "dependencies": {
     "cors": "^2.8.5",
@@ -30,9 +32,11 @@
     "@types/pg": "^8.11.6",
     "@types/uuid": "^9.0.8",
     "jest": "^29.7.0",
+    "concurrently": "^9.0.1",
     "ts-jest": "^29.2.4",
     "ts-node": "^10.9.2",
-    "typescript": "^5.4.5"
+    "typescript": "^5.4.5",
+    "@playwright/test": "^1.44.0"
   },
   "jest": {
     "preset": "ts-jest",

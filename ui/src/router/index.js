@@ -68,7 +68,7 @@ const router = createBrowserRouter([
                     { path: 'leave-types/new', element: _jsx(HrAdminNewLeaveType, {}) },
                     { path: 'leave-types/:id/edit', element: _jsx(HrAdminEditLeaveType, {}) },
                     { path: 'balances', element: _jsx(HrAdminBalances, {}) },
-                    { path: 'balances/set', element: _jsx(HrAdminSetBalance, {}) },
+                    { path: 'balances/edit', element: _jsx(HrAdminSetBalance, {}) },
                     { path: 'requests', element: _jsx(HrAdminRequests, {}) },
                     { path: 'requests/:id', element: _jsx(HrAdminRequestDetail, {}) },
                     { path: 'audit', element: _jsx(HrAdminAuditTrail, {}) },

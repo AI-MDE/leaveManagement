@@ -68,7 +68,8 @@
     "styling":     "tailwind",
     "stateClient": "tanstack-query",
     "authScheme":  "jwt-bearer",
-    "apiProxy":    "http://localhost:3000"
+    "apiProxy":    "http://localhost:3000",
+    "devUrl":      "http://localhost:5173"
   },
 
   "output": {
@@ -85,5 +86,22 @@
     "unitPattern":        "/dev/leaveManagement/test/unit/**/*.test.ts",
     "integrationPattern": "/dev/leaveManagement/test/integration/**/*.test.ts",
     "framework":          "jest"
+  },
+
+  "screenshots": {
+    "outputDir":       "output/screenshots",
+    "uiModulePattern": "design/modules/ui/ui-*.json",
+    "auth": {
+      "email":    "admin@example.com",
+      "password": "password"
+    },
+    "sampleIds": {
+      "/my-leave/requests/:id":                    "880e8400-e29b-41d4-a716-446655440001",
+      "/my-leave/requests/:id/edit":               "880e8400-e29b-41d4-a716-446655440001",
+      "/team-approvals/pending/:id":               "880e8400-e29b-41d4-a716-446655440002",
+      "/team-approvals/history/:id":               "880e8400-e29b-41d4-a716-446655440003",
+      "/hr-administration/leave-types/:id/edit":   "660e8400-e29b-41d4-a716-446655440001",
+      "/hr-administration/requests/:id":           "880e8400-e29b-41d4-a716-446655440001"
+    }
   }
 }
