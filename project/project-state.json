@@ -1,13 +1,13 @@
 {
   "current_phase": "database-ready",
-  "last_command": "generate_screenshots",
+  "last_command": "export_docs",
   "last_run_at": "2026-03-31T00:00:00Z",
   "completed_commands": [
     "perform_business_analysis","generate_business_functions","generate_use_cases",
     "build_system_design","generate_modules","generate_source_code","generate_glossary",
     "generate_ldm","generate_sample_data","setup_dev_environment","generate_sql","generate_diagrams",
     "generate_ui_outline","generate_ui_source_code","database_initialization","seed_data_loaded",
-    "generate_screenshots"
+    "generate_screenshots","export_docs"
   ],
   "database_status": {
     "initialized": true,
@@ -63,7 +63,10 @@
     "scripts/verifyDatabase.js": "new",
     "SETUP.md": "complete",
     "scripts/takeScreenshots.js": "complete",
-    "configuration.json#screenshots": "complete"
+    "configuration.json#screenshots": "complete",
+    "scripts/exportDocs.js": "complete",
+    "configuration.json#export": "complete",
+    "output/export/mkdocs": "complete — 107 pages"
   },
   "ready_to_run": {
     "database_backend": "npm run dev",

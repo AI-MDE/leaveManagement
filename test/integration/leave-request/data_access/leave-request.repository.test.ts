@@ -13,6 +13,7 @@ let db: DatabaseClient;
 let repo: LeaveRequestRepository;
 
 const TEST_EMP_ID = 'a0000000-0000-0000-0000-000000000001';
+const TEST_MGR_ID = 'a0000000-0000-0000-0000-000000000002';
 const TEST_LT_ID  = 'b0000000-0000-0000-0000-000000000001';
 const TEST_REQ_ID = 'c0000000-0000-0000-0000-000000000001';
 
@@ -42,9 +43,15 @@ beforeAll(async () => {
   // Seed prerequisite rows (ON CONFLICT DO NOTHING for idempotency)
   await client.query(
     `INSERT INTO employees (id, name, email, manager_id, role, created_at, updated_at)
-     VALUES ($1, 'Test Employee', 'test-repo@example.com', NULL, 'EMPLOYEE', now(), now())
+     VALUES ($1, 'Repo Test Manager', 'test-repo-mgr@example.com', NULL, 'MANAGER', now(), now())
      ON CONFLICT DO NOTHING`,
-    [TEST_EMP_ID],
+    [TEST_MGR_ID],
+  );
+  await client.query(
+    `INSERT INTO employees (id, name, email, manager_id, role, created_at, updated_at)
+     VALUES ($1, 'Test Employee', 'test-repo@example.com', $2, 'EMPLOYEE', now(), now())
+     ON CONFLICT DO NOTHING`,
+    [TEST_EMP_ID, TEST_MGR_ID],
   );
   await client.query(
     `INSERT INTO leave_types (id, code, name, advance_notice_days, requires_balance, is_active, created_at, updated_at)
@@ -57,7 +64,7 @@ beforeAll(async () => {
 afterAll(async () => {
   await client.query('DELETE FROM leave_requests WHERE id = $1', [TEST_REQ_ID]);
   await client.query('DELETE FROM leave_types   WHERE id = $1', [TEST_LT_ID]);
-  await client.query('DELETE FROM employees     WHERE id = $1', [TEST_EMP_ID]);
+  await client.query('DELETE FROM employees     WHERE id = ANY($1)', [[TEST_EMP_ID, TEST_MGR_ID]]);
   await client.end();
 });
 
@@ -101,12 +108,12 @@ describe('LeaveRequestRepository (integration)', () => {
     });
     await repo.save(entity);
 
-    entity.approve('mgr-001', 'Looks good');
+    entity.approve(TEST_MGR_ID, 'Looks good');
     await repo.update(entity);
 
     const updated = await repo.findById(TEST_REQ_ID);
     expect(updated!.status).toBe('APPROVED');
-    expect(updated!.reviewedBy).toBe('mgr-001');
+    expect(updated!.reviewedBy).toBe(TEST_MGR_ID);
     expect(updated!.managerComment).toBe('Looks good');
   });
 
