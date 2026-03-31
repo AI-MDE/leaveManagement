@@ -88,6 +88,24 @@
     "framework":          "jest"
   },
 
+  "export": {
+    "viewerUrl":  "http://localhost:4000",
+    "outputDir":  "output/export",
+    "mkdocs": {
+      "siteName": "Leave Management System",
+      "theme":    "material",
+      "docsDir":  "output/export/mkdocs/docs",
+      "ymlPath":  "output/export/mkdocs/mkdocs.yml"
+    },
+    "confluence": {
+      "baseUrl":   "",
+      "spaceKey":  "",
+      "parentPageId": "",
+      "email":     "",
+      "apiToken":  ""
+    }
+  },
+
   "screenshots": {
     "outputDir":       "output/screenshots",
     "uiModulePattern": "design/modules/ui/ui-*.json",
