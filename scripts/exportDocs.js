@@ -166,6 +166,64 @@ function normalizeForExport(docType, data) {
   return data;
 }
 
+function renderEntityMarkdown(raw) {
+  const e = raw?.entity || raw || {};
+  const attrs = e.attributes || e.fields || [];
+  const rels = e.relationships || [];
+  const rules = e.business_rules || e.rules || [];
+  const refs = e.source_refs || [];
+
+  const lines = [];
+  lines.push(`# ${e.name || e.id || 'Entity'}`);
+  lines.push('');
+  if (e.id) lines.push(`- **ID:** ${e.id}`);
+  if (e.description) lines.push(`- **Description:** ${e.description}`);
+  if (e.actor_ref) lines.push(`- **Actor Ref:** ${e.actor_ref}`);
+  if (lines[lines.length - 1] !== '') lines.push('');
+
+  if (attrs.length) {
+    lines.push('## Attributes');
+    lines.push('');
+    lines.push('| Name | Type | Constraints | Notes |');
+    lines.push('|---|---|---|---|');
+    for (const a of attrs) {
+      const constraints = Array.isArray(a.constraints) ? a.constraints.join(', ') : '';
+      const notes = [a.note, a.description, Array.isArray(a.values) ? `values: ${a.values.join(', ')}` : '']
+        .filter(Boolean)
+        .join(' · ');
+      lines.push(`| ${a.name || ''} | ${a.type || ''} | ${constraints} | ${notes} |`);
+    }
+    lines.push('');
+  }
+
+  if (rels.length) {
+    lines.push('## Relationships');
+    lines.push('');
+    lines.push('| Type | Target | Cardinality | Description |');
+    lines.push('|---|---|---|---|');
+    for (const r of rels) {
+      lines.push(`| ${r.type || ''} | ${r.target || r.entity || ''} | ${r.cardinality || ''} | ${r.description || ''} |`);
+    }
+    lines.push('');
+  }
+
+  if (rules.length) {
+    lines.push('## Business Rules');
+    lines.push('');
+    for (const r of rules) lines.push(`- ${r}`);
+    lines.push('');
+  }
+
+  if (refs.length) {
+    lines.push('## Source Refs');
+    lines.push('');
+    lines.push(refs.map(r => `\`${r}\``).join(', '));
+    lines.push('');
+  }
+
+  return lines.join('\n');
+}
+
 // ── Skip list — doc types that don't export well ──────────────────────────────
 
 const SKIP_TYPES = new Set(['source-code', 'ui-source-code', 'sql', 'schema-state', 'sample-data']);
@@ -187,6 +245,14 @@ async function renderDoc(doc, catalogByType) {
 
   // Already markdown
   if (ext === 'md') return content;
+
+  if (doc.docType === 'entity' && ext === 'json') {
+    try {
+      return renderEntityMarkdown(JSON.parse(content));
+    } catch {
+      // fall through to default handling
+    }
+  }
 
   // JSON doc with a templateRef
   const catalogEntry = catalogByType[doc.docType];
@@ -235,6 +301,24 @@ function filterTreeForExport(tree) {
   return (tree || []).filter(section => !EXCLUDED_SECTION_IDS.has(section.id));
 }
 
+function listScreenshotFiles(dirs) {
+  const supported = new Set(['.png', '.jpg', '.jpeg', '.webp', '.gif']);
+  const files = [];
+  const seen = new Set();
+
+  for (const dir of dirs) {
+    if (!dir || !fs.existsSync(dir)) continue;
+    for (const name of fs.readdirSync(dir)) {
+      const ext = path.extname(name).toLowerCase();
+      if (!supported.has(ext)) continue;
+      if (seen.has(name)) continue;
+      seen.add(name);
+      files.push({ name, abs: path.join(dir, name) });
+    }
+  }
+  return files.sort((a, b) => a.name.localeCompare(b.name));
+}
+
 // ── MkDocs export ─────────────────────────────────────────────────────────────
 
 async function exportMkDocs(tree, catalogByType) {
@@ -280,15 +364,32 @@ async function exportMkDocs(tree, catalogByType) {
     console.log(`[ok]   ${doc.label.padEnd(45)} → ${relFile}`);
   }
 
-  // Copy screenshots
+  // Copy screenshots + generate gallery page
   const screensDir = path.resolve(ROOT, exportCfg.screenshots?.outputDir || config.screenshots?.outputDir || 'output/screenshots');
+  const screensFallbackDir = path.resolve(ROOT, 'docs/screens');
   const assetsDir  = path.join(docsDir, 'assets', 'screenshots');
-  if (fs.existsSync(screensDir)) {
+  const shotFiles = listScreenshotFiles([screensDir, screensFallbackDir]);
+  if (shotFiles.length) {
     fs.mkdirSync(assetsDir, { recursive: true });
-    for (const f of fs.readdirSync(screensDir).filter(f => f.endsWith('.png'))) {
-      fs.copyFileSync(path.join(screensDir, f), path.join(assetsDir, f));
+    for (const shot of shotFiles) {
+      fs.copyFileSync(shot.abs, path.join(assetsDir, shot.name));
     }
-    console.log(`[ok]   Screenshots copied → assets/screenshots/`);
+    console.log(`[ok]   Screenshots copied to assets/screenshots/ (${shotFiles.length})`);
+
+    const screenshotsPage = [
+      '# Screenshots',
+      '',
+      'Generated screenshot gallery.',
+      '',
+      ...shotFiles.flatMap(shot => [
+        `## ${shot.name}`,
+        '',
+        `![${shot.name}](assets/screenshots/${shot.name})`,
+        '',
+      ]),
+    ].join('\n');
+    fs.writeFileSync(path.join(docsDir, 'screenshots.md'), screenshotsPage, 'utf8');
+    console.log('[ok]   Screenshot gallery page -> screenshots.md');
   }
 
   // Ensure mermaid initializer exists for MkDocs Material runtime rendering.
@@ -346,6 +447,7 @@ async function exportMkDocs(tree, catalogByType) {
     `  - ${mermaidInitRel}`,
     `nav:`,
     `  - Home: index.md`,
+    ...(shotFiles.length ? [`  - Screenshots: screenshots.md`] : []),
     ...navYaml,
   ].join('\n');
 
@@ -361,23 +463,24 @@ async function exportMkDocs(tree, catalogByType) {
 }
 
 function buildMkDocsNav(navSections) {
+  const y = (label) => JSON.stringify(String(label));
   const lines = [];
   for (const [section, groups] of Object.entries(navSections)) {
     const rootDocs = groups['__root__'] || [];
     const subGroups = Object.entries(groups).filter(([k]) => k !== '__root__');
 
     if (!subGroups.length && rootDocs.length === 1) {
-      lines.push(`  - ${section}: ${rootDocs[0].file}`);
+      lines.push(`  - ${y(section)}: ${rootDocs[0].file}`);
     } else {
-      lines.push(`  - ${section}:`);
+      lines.push(`  - ${y(section)}:`);
       for (const { label, file } of rootDocs) {
-        lines.push(`    - ${label}: ${file}`);
+        lines.push(`    - ${y(label)}: ${file}`);
       }
       for (const [grpSlug, docs] of subGroups) {
         const grpLabel = grpSlug.split('/').pop().replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-        lines.push(`    - ${grpLabel}:`);
+        lines.push(`    - ${y(grpLabel)}:`);
         for (const { label, file } of docs) {
-          lines.push(`      - ${label}: ${file}`);
+          lines.push(`      - ${y(label)}: ${file}`);
         }
       }
     }

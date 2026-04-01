@@ -14,71 +14,66 @@ extra_javascript:
   - javascripts/mermaid-init.js
 nav:
   - Home: index.md
-  - Publish Guide: publish.md
-  - Business Analysis:
-    - Requirements: business-analysis/requirements.md
-    - Analysis Status: business-analysis/analysis-status.md
-    - Glossary: business-analysis/glossary.md
-    - Business Functions: business-analysis/business-functions.md
-    - Logical Data Model: business-analysis/ldm.md
-    - Logical Data Model:
-      - logical-data-model: business-analysis/logical-data-model/logical-data-model.md
-    - Use Cases:
-      - UC-001 — Submit Leave Request: business-analysis/use-cases/uc-001-submit-leave-request.md
-      - UC-002 — Modify Leave Request: business-analysis/use-cases/uc-002-modify-leave-request.md
-      - UC-003 — Cancel Leave Request: business-analysis/use-cases/uc-003-cancel-leave-request.md
-      - UC-004 — Approve Leave Request: business-analysis/use-cases/uc-004-approve-leave-request.md
-      - UC-005 — Reject Leave Request: business-analysis/use-cases/uc-005-reject-leave-request.md
-      - UC-006 — Validate Leave Balance: business-analysis/use-cases/uc-006-validate-leave-balance.md
-      - UC-007 — Manage Leave Balances: business-analysis/use-cases/uc-007-manage-leave-balances.md
-      - UC-008 — Manage Leave Types: business-analysis/use-cases/uc-008-manage-leave-types.md
-      - UC-009 — Send Event Notifications: business-analysis/use-cases/uc-009-send-event-notifications.md
-      - UC-010 — View Leave History: business-analysis/use-cases/uc-010-view-leave-history.md
-      - UC-011 — Maintain Audit Trail: business-analysis/use-cases/uc-011-maintain-audit-trail.md
-    - Q A:
-      - Completed Questions: business-analysis/q-a/completed-questions.md
-      - Open Queue: business-analysis/q-a/open-queue.md
-      - Active Questions: business-analysis/q-a/questions.md
-  - System Design:
-    - Application Architecture: system-design/application-architecture.md
-    - Architecture: system-design/architecture.md
-    - Leave Request Flow: system-design/leave-request-flow.md
-    - Data Flow: system-design/dataflow.md
-    - Physical Data Model: system-design/pdm.md
-    - Entities:
-      - Employee: system-design/entities/ent-employee.md
-      - LeaveAuditEntry: system-design/entities/ent-leave-audit-entry.md
-      - LeaveBalance: system-design/entities/ent-leave-balance.md
-      - LeaveRequest: system-design/entities/ent-leave-request.md
-      - LeaveType: system-design/entities/ent-leave-type.md
-      - Notification: system-design/entities/ent-notification.md
-  - Modules:
-    - Module Catalog: modules/module-catalog.md
-    - Integration:
+  - Screenshots: screenshots.md
+  - "Business Analysis":
+    - "Requirements": business-analysis/requirements.md
+    - "Analysis Status": business-analysis/analysis-status.md
+    - "Glossary": business-analysis/glossary.md
+    - "Business Functions": business-analysis/business-functions.md
+    - "Logical Data Model": business-analysis/ldm.md
+    - "Logical Data Model":
+      - "logical-data-model": business-analysis/logical-data-model/logical-data-model.md
+    - "Use Cases":
+      - "UC-001 — Submit Leave Request": business-analysis/use-cases/uc-001-submit-leave-request.md
+      - "UC-002 — Modify Leave Request": business-analysis/use-cases/uc-002-modify-leave-request.md
+      - "UC-003 — Cancel Leave Request": business-analysis/use-cases/uc-003-cancel-leave-request.md
+      - "UC-004 — Approve Leave Request": business-analysis/use-cases/uc-004-approve-leave-request.md
+      - "UC-005 — Reject Leave Request": business-analysis/use-cases/uc-005-reject-leave-request.md
+      - "UC-006 — Validate Leave Balance": business-analysis/use-cases/uc-006-validate-leave-balance.md
+      - "UC-007 — Manage Leave Balances": business-analysis/use-cases/uc-007-manage-leave-balances.md
+      - "UC-008 — Manage Leave Types": business-analysis/use-cases/uc-008-manage-leave-types.md
+      - "UC-009 — Send Event Notifications": business-analysis/use-cases/uc-009-send-event-notifications.md
+      - "UC-010 — View Leave History": business-analysis/use-cases/uc-010-view-leave-history.md
+      - "UC-011 — Maintain Audit Trail": business-analysis/use-cases/uc-011-maintain-audit-trail.md
+    - "Q A":
+      - "Completed Questions": business-analysis/q-a/completed-questions.md
+      - "Open Queue": business-analysis/q-a/open-queue.md
+      - "Active Questions": business-analysis/q-a/questions.md
+  - "System Design":
+    - "Application Architecture": system-design/application-architecture.md
+    - "Architecture": system-design/architecture.md
+    - "Leave Request Flow": system-design/leave-request-flow.md
+    - "Data Flow": system-design/dataflow.md
+    - "Physical Data Model": system-design/pdm.md
+    - "Entities":
+      - "Employee": system-design/entities/ent-employee.md
+      - "LeaveAuditEntry": system-design/entities/ent-leave-audit-entry.md
+      - "LeaveBalance": system-design/entities/ent-leave-balance.md
+      - "LeaveRequest": system-design/entities/ent-leave-request.md
+      - "LeaveType": system-design/entities/ent-leave-type.md
+      - "Notification": system-design/entities/ent-notification.md
+  - "Modules":
+    - "Module Catalog": modules/module-catalog.md
+    - "Integration":
       - "Module: Audit (integration)": modules/module-specs/integration/module-audit.md
       - "Module: Notification (integration)": modules/module-specs/integration/module-notification.md
-    - Master Data:
+    - "Master Data":
       - "Module: Employee (master_data)": modules/module-specs/master-data/module-employee.md
       - "Module: LeaveType (master_data)": modules/module-specs/master-data/module-leave-type.md
-    - Rule Engine:
+    - "Rule Engine":
       - "Module: LeaveBalance (rule_engine)": modules/module-specs/rule-engine/module-leave-balance.md
-    - Workflow:
+    - "Workflow":
       - "Module: LeaveRequest (workflow)": modules/module-specs/workflow/module-leave-request.md
-  - UI Design:
-    - UI Catalog: ui-design/ui-catalog.md
-    - Ui Modules:
-      - HR Administration: ui-design/ui-modules/ui-hr-administration.md
-      - My Leave: ui-design/ui-modules/ui-my-leave.md
-      - Team Approvals: ui-design/ui-modules/ui-team-approvals.md
-  - Governance:
-    - Diagrams:
-      - Logical Data Model: governance/diagrams/ldm.md
-      - Architecture: governance/diagrams/architecture.md
-      - Leave Request Flow: governance/diagrams/leave-request-flow.md
-      - Data Flow: governance/diagrams/dataflow.md
-      - Physical Data Model: governance/diagrams/pdm.md
-  - Project Initiation:
-    - Configuration: project-initiation/configuration.md
-    - Application Definition: project-initiation/application.md
-    - Project State: project-initiation/project-state.md
-    - Command Log: project-initiation/command-log.md
+  - "UI Design":
+    - "UI Catalog": ui-design/ui-catalog.md
+    - "Ui Modules":
+      - "HR Administration": ui-design/ui-modules/ui-hr-administration.md
+      - "My Leave": ui-design/ui-modules/ui-my-leave.md
+      - "Team Approvals": ui-design/ui-modules/ui-team-approvals.md
+  - "Governance":
+    - "Diagrams":
+      - "Logical Data Model": governance/diagrams/ldm.md
+      - "Architecture": governance/diagrams/architecture.md
+      - "Leave Request Flow": governance/diagrams/leave-request-flow.md
+      - "Data Flow": governance/diagrams/dataflow.md
+      - "Physical Data Model": governance/diagrams/pdm.md

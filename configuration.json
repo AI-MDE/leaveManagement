@@ -94,8 +94,8 @@
     "mkdocs": {
       "siteName": "Leave Management System",
       "theme":    "material",
-      "docsDir":  "output/export/mkdocs/docs",
-      "ymlPath":  "output/export/mkdocs/mkdocs.yml"
+      "docsDir":  "mkdocs/docs",
+      "ymlPath":  "mkdocs/mkdocs.yml"
     },
     "confluence": {
       "baseUrl":   "",

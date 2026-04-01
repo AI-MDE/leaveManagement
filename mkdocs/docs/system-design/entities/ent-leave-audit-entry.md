@@ -1,36 +1,29 @@
 # LeaveAuditEntry
 
-```json
-{
-  "entity": {
-    "id": "ENT-005",
-    "name": "LeaveAuditEntry",
-    "description": "Immutable audit record for every state change on a LeaveRequest. Satisfies FR-016 / NFR-002.",
-    "attributes": [
-      { "name": "id",               "type": "uuid",    "constraints": ["PK", "NOT NULL"] },
-      { "name": "leave_request_id", "type": "uuid",    "constraints": ["FK -> LeaveRequest.id", "NOT NULL"] },
-      { "name": "actor_id",         "type": "uuid",    "constraints": ["FK -> Employee.id", "NOT NULL"],
-        "note": "Who performed the action" },
-      { "name": "action",           "type": "enum",    "constraints": ["NOT NULL"],
-        "values": ["SUBMITTED", "APPROVED", "REJECTED", "CANCELLED", "MODIFIED", "BALANCE_RESTORED"],
-        "note": "Event type — append-only log" },
-      { "name": "from_status",      "type": "string",  "constraints": ["NULLABLE"] },
-      { "name": "to_status",        "type": "string",  "constraints": ["NULLABLE"] },
-      { "name": "comment",          "type": "string",  "constraints": ["NULLABLE"] },
-      { "name": "snapshot",         "type": "jsonb",   "constraints": ["NULLABLE"],
-        "note": "Optional JSON snapshot of LeaveRequest at the time of the event" },
-      { "name": "occurred_at",      "type": "datetime","constraints": ["NOT NULL"] }
-    ],
-    "notes": [
-      "Rows are never updated or deleted — append-only for audit integrity",
-      "snapshot field allows point-in-time reconstruction of request state"
-    ],
-    "relationships": [
-      { "type": "belongs_to", "target": "LeaveRequest", "cardinality": "many-to-one" },
-      { "type": "belongs_to", "target": "Employee",     "cardinality": "many-to-one", "description": "Actor who triggered the event" }
-    ],
-    "source_refs": ["FR-015", "FR-016", "NFR-002"]
-  }
-}
+- **ID:** ENT-005
+- **Description:** Immutable audit record for every state change on a LeaveRequest. Satisfies FR-016 / NFR-002.
 
-```
+## Attributes
+
+| Name | Type | Constraints | Notes |
+|---|---|---|---|
+| id | uuid | PK, NOT NULL |  |
+| leave_request_id | uuid | FK -> LeaveRequest.id, NOT NULL |  |
+| actor_id | uuid | FK -> Employee.id, NOT NULL | Who performed the action |
+| action | enum | NOT NULL | Event type — append-only log · values: SUBMITTED, APPROVED, REJECTED, CANCELLED, MODIFIED, BALANCE_RESTORED |
+| from_status | string | NULLABLE |  |
+| to_status | string | NULLABLE |  |
+| comment | string | NULLABLE |  |
+| snapshot | jsonb | NULLABLE | Optional JSON snapshot of LeaveRequest at the time of the event |
+| occurred_at | datetime | NOT NULL |  |
+
+## Relationships
+
+| Type | Target | Cardinality | Description |
+|---|---|---|---|
+| belongs_to | LeaveRequest | many-to-one |  |
+| belongs_to | Employee | many-to-one | Actor who triggered the event |
+
+## Source Refs
+
+`FR-015`, `FR-016`, `NFR-002`

@@ -1,32 +1,28 @@
 # Notification
 
-```json
-{
-  "entity": {
-    "id": "ENT-006",
-    "name": "Notification",
-    "description": "An email notification record tracking what was sent, to whom, and for which event. Provides delivery traceability.",
-    "attributes": [
-      { "name": "id",               "type": "uuid",    "constraints": ["PK", "NOT NULL"] },
-      { "name": "leave_request_id", "type": "uuid",    "constraints": ["FK -> LeaveRequest.id", "NOT NULL"] },
-      { "name": "recipient_id",     "type": "uuid",    "constraints": ["FK -> Employee.id", "NOT NULL"] },
-      { "name": "event",            "type": "enum",    "constraints": ["NOT NULL"],
-        "values": ["SUBMITTED", "APPROVED", "REJECTED", "CANCELLED", "MODIFIED_PENDING", "MODIFIED_APPROVED"] },
-      { "name": "channel",          "type": "enum",    "constraints": ["NOT NULL"],
-        "values": ["EMAIL"],
-        "note": "Email only per Q-005" },
-      { "name": "sent_at",          "type": "datetime","constraints": ["NULLABLE"],
-        "note": "NULL if not yet dispatched" },
-      { "name": "status",           "type": "enum",    "constraints": ["NOT NULL"],
-        "values": ["PENDING", "SENT", "FAILED"] },
-      { "name": "created_at",       "type": "datetime","constraints": ["NOT NULL"] }
-    ],
-    "relationships": [
-      { "type": "belongs_to", "target": "LeaveRequest", "cardinality": "many-to-one" },
-      { "type": "belongs_to", "target": "Employee",     "cardinality": "many-to-one", "description": "Recipient" }
-    ],
-    "source_refs": ["FR-013", "FR-013a", "FR-013b", "FR-013c", "FR-013d", "FR-013e"]
-  }
-}
+- **ID:** ENT-006
+- **Description:** An email notification record tracking what was sent, to whom, and for which event. Provides delivery traceability.
 
-```
+## Attributes
+
+| Name | Type | Constraints | Notes |
+|---|---|---|---|
+| id | uuid | PK, NOT NULL |  |
+| leave_request_id | uuid | FK -> LeaveRequest.id, NOT NULL |  |
+| recipient_id | uuid | FK -> Employee.id, NOT NULL |  |
+| event | enum | NOT NULL | values: SUBMITTED, APPROVED, REJECTED, CANCELLED, MODIFIED_PENDING, MODIFIED_APPROVED |
+| channel | enum | NOT NULL | Email only per Q-005 · values: EMAIL |
+| sent_at | datetime | NULLABLE | NULL if not yet dispatched |
+| status | enum | NOT NULL | values: PENDING, SENT, FAILED |
+| created_at | datetime | NOT NULL |  |
+
+## Relationships
+
+| Type | Target | Cardinality | Description |
+|---|---|---|---|
+| belongs_to | LeaveRequest | many-to-one |  |
+| belongs_to | Employee | many-to-one | Recipient |
+
+## Source Refs
+
+`FR-013`, `FR-013a`, `FR-013b`, `FR-013c`, `FR-013d`, `FR-013e`
