@@ -19,8 +19,8 @@ Read these files first:
 
 ## Startup Rules
 - Resolve user requests through `/dev/ai-mdeai-instructions/commands/*.json`
-- Follow `/dev/ai-mdeai-instructions/orchestrator.json` for phase rules and execution pipeline
-- Skill source files live in `/dev/ai-mdeai-instructions/skills/`
+- Follow `/dev/ai-mde/ai-instructions/orchestrator.json` for phase rules and execution pipeline
+- Skill source files live in `/dev/ai-mde/ai-instructions/skills/`
 
 ## Slash Command Contract
 - If user input starts with `/mde `, treat it as an MDE command invocation

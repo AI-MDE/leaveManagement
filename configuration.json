@@ -21,7 +21,7 @@
   },
 
   "ba": {
-    "requirements":      "/dev/leaveManagement/ba/requirements.md",
+    "requirements":      "/dev/leaveManagement/ba/",
     "analysisStatus":    "/dev/leaveManagement/ba/analysis-status.md",
     "glossary":          "/dev/leaveManagement/ba/glossary.md",
     "discovery":         "/dev/leaveManagement/ba/discovery",

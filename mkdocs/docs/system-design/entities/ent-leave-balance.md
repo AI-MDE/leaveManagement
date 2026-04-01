@@ -1,0 +1,33 @@
+# LeaveBalance
+
+```json
+{
+  "entity": {
+    "id": "ENT-003",
+    "name": "LeaveBalance",
+    "description": "The current leave balance for a specific Employee and LeaveType. Updated on approval and restored on cancellation.",
+    "attributes": [
+      { "name": "id",              "type": "uuid",    "constraints": ["PK", "NOT NULL"] },
+      { "name": "employee_id",     "type": "uuid",    "constraints": ["FK -> Employee.id", "NOT NULL"] },
+      { "name": "leave_type_id",   "type": "uuid",    "constraints": ["FK -> LeaveType.id", "NOT NULL"] },
+      { "name": "total_days",      "type": "decimal", "constraints": ["NOT NULL"],
+        "note": "Allocated entitlement for the period" },
+      { "name": "used_days",       "type": "decimal", "constraints": ["NOT NULL", "DEFAULT 0"] },
+      { "name": "pending_days",    "type": "decimal", "constraints": ["NOT NULL", "DEFAULT 0"],
+        "note": "Days reserved by pending/approved-but-not-yet-started requests" },
+      { "name": "period_year",     "type": "integer", "constraints": ["NOT NULL"],
+        "note": "Balances are tracked per calendar year" },
+      { "name": "updated_at",      "type": "datetime","constraints": ["NOT NULL"] }
+    ],
+    "unique_constraints": [
+      ["employee_id", "leave_type_id", "period_year"]
+    ],
+    "relationships": [
+      { "type": "belongs_to", "target": "Employee",  "cardinality": "many-to-one" },
+      { "type": "belongs_to", "target": "LeaveType", "cardinality": "many-to-one" }
+    ],
+    "source_refs": ["FR-002", "FR-003", "FR-008", "BR-001", "BR-004"]
+  }
+}
+
+```

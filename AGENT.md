@@ -14,7 +14,7 @@ Read these files first:
 
 ## Startup Rules
 - Resolve user requests through `/dev/ai-mdeai-instructions/commands/*.json`
-- Follow `/dev/ai-mdeai-instructions/orchestrator.json` for phase rules and execution pipeline
+- Follow `/dev/ai-mde/ai-instructions/orchestrator.json` for phase rules and execution pipeline
 - Skill source files live in `/dev/ai-mdeai-instructions/skills/`
 
 ## Slash Command Contract

@@ -17,7 +17,9 @@
     "test:integration": "jest --testPathPattern=test/integration",
     "test:screenshots": "node scripts/takeScreenshots.js",
     "export:mkdocs": "node scripts/exportDocs.js --target=mkdocs",
-    "export:confluence": "node scripts/exportDocs.js --target=confluence"
+    "export:confluence": "node scripts/exportDocs.js --target=confluence",
+    "docs:serve": "mkdocs serve -f mkdocs/mkdocs.yml",
+    "docs:build": "mkdocs build -f mkdocs/mkdocs.yml --clean"
   },
   "dependencies": {
     "cors": "^2.8.5",
