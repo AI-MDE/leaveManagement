@@ -14,6 +14,7 @@ extra_javascript:
   - javascripts/mermaid-init.js
 nav:
   - Home: index.md
+  - Publish Guide: publish.md
   - Business Analysis:
     - Requirements: business-analysis/requirements.md
     - Analysis Status: business-analysis/analysis-status.md
